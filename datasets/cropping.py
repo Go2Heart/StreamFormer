@@ -4,17 +4,21 @@
 # --------------------------------------------------------
 # croppping utilities
 # --------------------------------------------------------
-import PIL.Image
 import os
+
+import PIL.Image
+
 os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
 import cv2  # noqa
 import numpy as np  # noqa
+
 try:
     lanczos = PIL.Image.Resampling.LANCZOS
     bicubic = PIL.Image.Resampling.BICUBIC
 except AttributeError:
     lanczos = PIL.Image.LANCZOS
     bicubic = PIL.Image.BICUBIC
+
 
 def colmap_to_opencv_intrinsics(K):
     """
@@ -41,9 +45,9 @@ def opencv_to_colmap_intrinsics(K):
     K[1, 2] += 0.5
     return K
 
+
 class ImageList:
-    """ Convenience class to aply the same operation to a whole set of images.
-    """
+    """Convenience class to aply the same operation to a whole set of images."""
 
     def __init__(self, images):
         if not isinstance(images, (tuple, list, set)):
@@ -67,18 +71,20 @@ class ImageList:
         return sizes[0]
 
     def resize(self, *args, **kwargs):
-        return ImageList(self._dispatch('resize', *args, **kwargs))
+        return ImageList(self._dispatch("resize", *args, **kwargs))
 
     def crop(self, *args, **kwargs):
-        return ImageList(self._dispatch('crop', *args, **kwargs))
+        return ImageList(self._dispatch("crop", *args, **kwargs))
 
     def _dispatch(self, func, *args, **kwargs):
         return [getattr(im, func)(*args, **kwargs) for im in self.images]
 
 
-def rescale_image_depthmap(image, depthmap, camera_intrinsics, output_resolution, force=True):
-    """ Jointly rescale a (image, depthmap) 
-        so that (out_width, out_height) >= output_res
+def rescale_image_depthmap(
+    image, depthmap, camera_intrinsics, output_resolution, force=True
+):
+    """Jointly rescale a (image, depthmap)
+    so that (out_width, out_height) >= output_res
     """
     image = ImageList(image)
     input_resolution = np.array(image.size)  # (W,H)
@@ -95,19 +101,34 @@ def rescale_image_depthmap(image, depthmap, camera_intrinsics, output_resolution
     output_resolution = np.floor(input_resolution * scale_final).astype(int)
 
     # first rescale the image so that it contains the crop
-    image = image.resize(tuple(output_resolution), resample=lanczos if scale_final < 1 else bicubic)
+    image = image.resize(
+        tuple(output_resolution), resample=lanczos if scale_final < 1 else bicubic
+    )
     if depthmap is not None:
-        depthmap = cv2.resize(depthmap, output_resolution, fx=scale_final,
-                              fy=scale_final, interpolation=cv2.INTER_NEAREST)
+        depthmap = cv2.resize(
+            depthmap,
+            output_resolution,
+            fx=scale_final,
+            fy=scale_final,
+            interpolation=cv2.INTER_NEAREST,
+        )
 
     # no offset here; simple rescaling
     camera_intrinsics = camera_matrix_of_crop(
-        camera_intrinsics, input_resolution, output_resolution, scaling=scale_final)
+        camera_intrinsics, input_resolution, output_resolution, scaling=scale_final
+    )
 
     return image.to_pil(), depthmap, camera_intrinsics
 
 
-def camera_matrix_of_crop(input_camera_matrix, input_resolution, output_resolution, scaling=1, offset_factor=0.5, offset=None):
+def camera_matrix_of_crop(
+    input_camera_matrix,
+    input_resolution,
+    output_resolution,
+    scaling=1,
+    offset_factor=0.5,
+    offset=None,
+):
     # Margins to offset the origin
     margins = np.asarray(input_resolution) * scaling - output_resolution
     assert np.all(margins >= 0.0)
@@ -140,7 +161,9 @@ def crop_image_depthmap(image, depthmap, camera_intrinsics, crop_bbox):
     return image.to_pil(), depthmap, camera_intrinsics
 
 
-def bbox_from_intrinsics_in_out(input_camera_matrix, output_camera_matrix, output_resolution):
+def bbox_from_intrinsics_in_out(
+    input_camera_matrix, output_camera_matrix, output_resolution
+):
     out_width, out_height = output_resolution
     l, t = np.int32(np.round(input_camera_matrix[:2, 2] - output_camera_matrix[:2, 2]))
     crop_bbox = (l, t, l + out_width, t + out_height)
