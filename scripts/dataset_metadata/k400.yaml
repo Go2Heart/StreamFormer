@@ -1,0 +1,25 @@
+datasets:
+  Kinetics:
+    train:
+      mode: "train"
+      data_path: "/remote-home/yibinyan/Kinetics-400"
+      prefix: "/remote-home/yibinyan/Kinetics-400/videos_train"
+      label2id_path: "/remote-home/yibinyan/Kinetics-400/label2id.json"
+      split: ","
+      num_frames: 16
+      num_segments: 4  # Changed to a more consistent name
+      num_crops: 3
+      input_size: 224
+      short_side_size: 224
+  #   validation:
+  #     mode: "validation"
+  #     data_path: "/remote-home/yibinyan/Kinetics-400"
+  #     prefix: "/remote-home/yibinyan/Kinetics-400/videos_val"
+  #     label2id_path: "/remote-home/yibinyan/Kinetics-400/label2id.json"
+  #     split: ","
+  #     num_frames: 16
+  #     num_segments: 4  # Changed to a more consistent name
+  #     num_crops: 3
+  #     input_size: 224
+  #     short_side_size: 224
+

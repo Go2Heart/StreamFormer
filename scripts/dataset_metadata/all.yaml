@@ -1,0 +1,152 @@
+datasets:
+  Kinetics:
+    train:
+      mode: "train"
+      data_path: "/mnt/vision_user/video/Kinetics400/raw/Kinetics-400"
+      prefix: '/mnt/vision_user/video/Kinetics400/raw/Kinetics-400/videos_train'      
+      label2id_path: "/mnt/vision_user/video/Kinetics400/raw/Kinetics-400/label2id.json"
+      split: ","
+      num_frames: 16
+      num_segments: 4  # Changed to a more consistent name
+      num_crops: 3
+      input_size: 224
+      short_side_size: 224
+    # validation:
+    #   mode: "validation"
+    #   data_path: "/mnt/vision_user/video/metadata/K400"
+    #   prefix: '/mnt/vision_user/video/Kinetics400/raw/Kinetics-400/videos_val'
+    #   label2id_path: "/mnt/vision_user/video/metadata/K400/label2id.json"
+    #   split: ","
+    #   num_frames: 16
+    #   num_segments: 4  # Changed to a more consistent name
+    #   num_crops: 3
+    #   input_size: 224
+    #   short_side_size: 224
+  
+  SSV2:
+    train:
+      mode: "train"
+      data_path: "/mnt/vision_user/video/metadata/ssv2"
+      prefix: "/mnt/vision_user/video/sthv2/raw/sthv2/sthv2/videos"
+      label2id_path: "/mnt/vision_user/video/metadata/ssv2/label2id.json"
+      split: ","
+      num_frames: 16
+      num_segments: 4  # Changed to a more consistent name
+      num_crops: 3
+      input_size: 224
+      short_side_size: 224
+    # validation:
+    #   mode: "validation"
+    #   data_path: "/mnt/petrelfs/xujilan/data/ssv2"
+    #   prefix: "sssd:s3://video_pub/ssv2_video/"
+    #   label2id_path: "/mnt/petrelfs/xujilan/data/ssv2/label2id.json"
+    #   split: ","
+    #   num_frames: 16
+    #   num_segments: 4  # Changed to a more consistent name
+    #   num_crops: 3
+    #   input_size: 224
+    #   short_side_size: 224
+
+  TaskRetrieval:
+    train:
+      mode: "train"
+      data_path: "/mnt/vision_user/video/metadata/task_retrieval/"
+      prefix: ""
+      num_frames: 16
+      input_size: 224
+      short_side_size: 224
+      data_dict:
+        root_dir:
+          MSRVTT: /mnt/vision_user/video/MSRVTT
+          MSVD: /mnt/vision_user/video/MSVD/MSVD_Videos
+          ActivityNet: /mnt/vision_user/video/ActivityNet/train
+          DiDeMo: /mnt/vision_user/video/DiDeMo
+          LSMDC: /mnt/vision_user/video/LSMDC/LSMDC
+          VATEX: /mnt/vision_user/video/VATEX
+          # WebVid: 'pnorm2:s3://webvid10m/'
+        trimmed30s:
+          MSRVTT: False
+          MSVD: False
+          ActivityNet: False
+          DiDeMo: True
+          LSMDC: False
+          VATEX: False
+          WebVid: False
+        is_paragraph_retrieval:
+          MSRVTT: False
+          MSVD: False
+          ActivityNet: True
+          DiDeMo: True
+          LSMDC: False
+          VATEX: False
+          WebVid: False
+
+  TaskGrounding:
+    train:
+      mode: "train"
+      data_path: "/mnt/vision_user/video/metadata/task_grounding/"
+      prefix: ""
+      num_frames: 16
+      input_size: 224
+      short_side_size: 224
+      test_num_segment: 1
+      test_num_crop: 1
+      sample_type: 'fixfps'
+      data_dict:
+        root_dir:
+          CharadesSTA: /mnt/vision_user/video/CHARADES/Charades_v1_480
+          QVHighlights: /mnt/vision_user/video/QVhighlight/videos
+          TaCoS: /mnt/vision_user/video/TACOS
+          ActivityNetCaptions: /mnt/vision_user/video/ActivityNet/train
+          DiDeMo: /mnt/vision_user/video/DiDeMo
+          QuerYD: /mnt/vision_user/video/QuerYD
+
+  TaskLocalization:
+    train:
+      mode: "train"
+      data_path: "/mnt/vision_user/video/metadata/task_localization"
+      prefix: ""
+      label2id_path: "/mnt/vision_user/video/metadata/task_localization/label2id.json"
+      num_frames: 16
+      input_size: 224
+      short_side_size: 224
+      test_num_segment: 4
+      test_num_crop: 3
+      window_size: 384
+      extract_feature: False
+      method: 'resize'
+      sample_type: 'uniform'
+      data_dict:
+        root_dir:
+          HACS: /mnt/vision_user/video/hacs/training
+          FineAction: /mnt/vision_user/video/fineaction
+          ActivityNet: /mnt/vision_user/video/ActivityNet/train
+
+  TaskVIS:
+    train:
+      mode: "train"
+      data_path: "/mnt/vision_user/video/metadata/task_vis/"
+      prefix: ""
+      label2id_path: "/mnt/vision_user/video/metadata/task_vis/label2id.json"
+      split: ","
+      num_frames: 16
+      num_crops: 3
+      input_size: 224
+      short_side_size: 224
+      data_dict:
+        root_dir:
+          COCOPseudoVIS: /mnt/vision_user/video/COCO2017/images/train2017
+          YoutubeVIS: /mnt/vision_user/video/ytvis19/train/JPEGImages
+          LVVIS: /mnt/vision_user/video/lvvis/train/JPEGImages
+  # TaskReferVOS:
+  #   train:
+  #     mode: "train"
+  #     data_path: "/mnt/vision_user/video/metadata/task_refervos/task_refervos_mevis_ytvos/"
+  #     prefix: ""
+  #     split: ","
+  #     num_frames: 16
+  #     num_segments: 4  # Changed to a more consistent name
+  #     num_crops: 3
+  #     input_size: 224
+  #     short_side_size: 224
+
