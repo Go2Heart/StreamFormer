@@ -2,9 +2,9 @@ datasets:
   Kinetics:
     train:
       mode: "train"
-      data_path: "/mnt/vision_user/video/Kinetics400/raw/Kinetics-400"
-      prefix: '/mnt/vision_user/video/Kinetics400/raw/Kinetics-400/videos_train'      
-      label2id_path: "/mnt/vision_user/video/Kinetics400/raw/Kinetics-400/label2id.json"
+      data_path: "/Path/to/Kinetics400/raw/Kinetics-400"
+      prefix: '/Path/to/Kinetics400/raw/Kinetics-400/videos_train'      
+      label2id_path: "/Path/to/Kinetics400/raw/Kinetics-400/label2id.json"
       split: ","
       num_frames: 16
       num_segments: 4  # Changed to a more consistent name
@@ -13,9 +13,9 @@ datasets:
       short_side_size: 224
     # validation:
     #   mode: "validation"
-    #   data_path: "/mnt/vision_user/video/metadata/K400"
-    #   prefix: '/mnt/vision_user/video/Kinetics400/raw/Kinetics-400/videos_val'
-    #   label2id_path: "/mnt/vision_user/video/metadata/K400/label2id.json"
+    #   data_path: "/Path/to/metadata/K400"
+    #   prefix: '/Path/to/Kinetics400/raw/Kinetics-400/videos_val'
+    #   label2id_path: "/Path/to/metadata/K400/label2id.json"
     #   split: ","
     #   num_frames: 16
     #   num_segments: 4  # Changed to a more consistent name
@@ -26,9 +26,9 @@ datasets:
   SSV2:
     train:
       mode: "train"
-      data_path: "/mnt/vision_user/video/metadata/ssv2"
-      prefix: "/mnt/vision_user/video/sthv2/raw/sthv2/sthv2/videos"
-      label2id_path: "/mnt/vision_user/video/metadata/ssv2/label2id.json"
+      data_path: "/Path/to/metadata/ssv2"
+      prefix: "/Path/to/sthv2/raw/sthv2/sthv2/videos"
+      label2id_path: "/Path/to/metadata/ssv2/label2id.json"
       split: ","
       num_frames: 16
       num_segments: 4  # Changed to a more consistent name
@@ -50,19 +50,19 @@ datasets:
   TaskRetrieval:
     train:
       mode: "train"
-      data_path: "/mnt/vision_user/video/metadata/task_retrieval/"
+      data_path: "/Path/to/metadata/task_retrieval/"
       prefix: ""
       num_frames: 16
       input_size: 224
       short_side_size: 224
       data_dict:
         root_dir:
-          MSRVTT: /mnt/vision_user/video/MSRVTT
-          MSVD: /mnt/vision_user/video/MSVD/MSVD_Videos
-          ActivityNet: /mnt/vision_user/video/ActivityNet/train
-          DiDeMo: /mnt/vision_user/video/DiDeMo
-          LSMDC: /mnt/vision_user/video/LSMDC/LSMDC
-          VATEX: /mnt/vision_user/video/VATEX
+          MSRVTT: /Path/to/MSRVTT
+          MSVD: /Path/to/MSVD/MSVD_Videos
+          ActivityNet: /Path/to/ActivityNet/train
+          DiDeMo: /Path/to/DiDeMo
+          LSMDC: /Path/to/LSMDC/LSMDC
+          VATEX: /Path/to/VATEX
           # WebVid: 'pnorm2:s3://webvid10m/'
         trimmed30s:
           MSRVTT: False
@@ -84,7 +84,7 @@ datasets:
   TaskGrounding:
     train:
       mode: "train"
-      data_path: "/mnt/vision_user/video/metadata/task_grounding/"
+      data_path: "/Path/to/metadata/task_grounding/"
       prefix: ""
       num_frames: 16
       input_size: 224
@@ -94,19 +94,19 @@ datasets:
       sample_type: 'fixfps'
       data_dict:
         root_dir:
-          CharadesSTA: /mnt/vision_user/video/CHARADES/Charades_v1_480
-          QVHighlights: /mnt/vision_user/video/QVhighlight/videos
-          TaCoS: /mnt/vision_user/video/TACOS
-          ActivityNetCaptions: /mnt/vision_user/video/ActivityNet/train
-          DiDeMo: /mnt/vision_user/video/DiDeMo
-          QuerYD: /mnt/vision_user/video/QuerYD
+          CharadesSTA: /Path/to/CHARADES/Charades_v1_480
+          QVHighlights: /Path/to/QVhighlight/videos
+          TaCoS: /Path/to/TACOS
+          ActivityNetCaptions: /Path/to/ActivityNet/train
+          DiDeMo: /Path/to/DiDeMo
+          QuerYD: /Path/to/QuerYD
 
   TaskLocalization:
     train:
       mode: "train"
-      data_path: "/mnt/vision_user/video/metadata/task_localization"
+      data_path: "/Path/to/metadata/task_localization"
       prefix: ""
-      label2id_path: "/mnt/vision_user/video/metadata/task_localization/label2id.json"
+      label2id_path: "/Path/to/metadata/task_localization/label2id.json"
       num_frames: 16
       input_size: 224
       short_side_size: 224
@@ -118,16 +118,16 @@ datasets:
       sample_type: 'uniform'
       data_dict:
         root_dir:
-          HACS: /mnt/vision_user/video/hacs/training
-          FineAction: /mnt/vision_user/video/fineaction
-          ActivityNet: /mnt/vision_user/video/ActivityNet/train
+          HACS: /Path/to/hacs/training
+          FineAction: /Path/to/fineaction
+          ActivityNet: /Path/to/ActivityNet/train
 
   TaskVIS:
     train:
       mode: "train"
-      data_path: "/mnt/vision_user/video/metadata/task_vis/"
+      data_path: "/Path/to/metadata/task_vis/"
       prefix: ""
-      label2id_path: "/mnt/vision_user/video/metadata/task_vis/label2id.json"
+      label2id_path: "/Path/to/metadata/task_vis/label2id.json"
       split: ","
       num_frames: 16
       num_crops: 3
@@ -135,13 +135,13 @@ datasets:
       short_side_size: 224
       data_dict:
         root_dir:
-          COCOPseudoVIS: /mnt/vision_user/video/COCO2017/images/train2017
-          YoutubeVIS: /mnt/vision_user/video/ytvis19/train/JPEGImages
-          LVVIS: /mnt/vision_user/video/lvvis/train/JPEGImages
+          COCOPseudoVIS: /Path/to/COCO2017/images/train2017
+          YoutubeVIS: /Path/to/ytvis19/train/JPEGImages
+          LVVIS: /Path/to/lvvis/train/JPEGImages
   # TaskReferVOS:
   #   train:
   #     mode: "train"
-  #     data_path: "/mnt/vision_user/video/metadata/task_refervos/task_refervos_mevis_ytvos/"
+  #     data_path: "/Path/to/metadata/task_refervos/task_refervos_mevis_ytvos/"
   #     prefix: ""
   #     split: ","
   #     num_frames: 16
