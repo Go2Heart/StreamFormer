@@ -1,4 +1,4 @@
-# StreamFormer
+# Learning Streaming Video Representation via Multitask
 [ICCV 2025] The official PyTorch implementation of Learning Streaming Video Representation via Multitask Training: https://arxiv.org/abs/2504.20041
 
 <div style="line-height: 1;">
