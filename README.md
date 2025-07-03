@@ -11,7 +11,8 @@
 </div>
 
 <div align="center">
-   <img src="./teaser.png">
+   <img src="./images/teaser.png">
+   <img src="./images/main.png">
 </div>
 
 ## TODO
