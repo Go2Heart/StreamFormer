@@ -1,0 +1,79 @@
+datasets:
+  - json_path: /PATH/TO/LLaVA-Video/0_30_s_academic_v0_1_cap_processed.json
+    sampling_strategy: "first:10%"
+  - json_path: /PATH/TO/LLaVA-Video/0_30_s_youtube_v0_1_cap_processed.json
+    sampling_strategy: "first:10%"
+  - json_path: /PATH/TO/LLaVA-Video/30_60_s_academic_v0_1_cap_processed.json
+    sampling_strategy: "first:10%"
+  - json_path: /PATH/TO/LLaVA-Video/30_60_s_youtube_v0_1_cap_processed.json
+    sampling_strategy: "first:10%"
+  # # - json_path: /PATH/TO/LLaVA-Video/1_2_m_academic_v0_1_cap_processed.json
+  #   # sampling_strategy: "first:10%"
+  # # - json_path: /PATH/TO/LLaVA-Video/1_2_m_youtube_v0_1_cap_processed.json
+  #   # sampling_strategy: "first:10%"
+  - json_path: /PATH/TO/LLaVA-Video/0_30_s_academic_oe_v0_1_qa_processed.json
+    sampling_strategy: "first:10%"
+  - json_path: /PATH/TO/LLaVA-Video/0_30_s_academic_mc_v0_1_qa_processed.json
+    sampling_strategy: "first:10%"
+  - json_path: /PATH/TO/LLaVA-Video/0_30_s_youtube_oe_v0_1_qa_processed.json
+    sampling_strategy: "first:10%"
+  - json_path: /PATH/TO/LLaVA-Video/0_30_s_youtube_mc_v0_1_qa_processed.json
+    sampling_strategy: "first:10%"
+  # - json_path: /PATH/TO/LLaVA-Video/0_30_s_activitynetqa_oe_qa_processed.json
+    # sampling_strategy: "first:10%"
+  # - json_path: /PATH/TO/LLaVA-Video/0_30_s_nextqa_oe_qa_processed.json
+    # sampling_strategy: "first:10%"
+  # - json_path: /PATH/TO/LLaVA-Video/0_30_s_nextqa_mc_qa_processed.json
+    # sampling_strategy: "first:10%"
+  # - json_path: /PATH/TO/LLaVA-Video/0_30_s_perceptiontest_mc_qa_processed.json
+  #   sampling_strategy: "first:10%"
+  - json_path: /PATH/TO/LLaVA-Video/30_60_s_academic_oe_v0_1_qa_processed.json
+    sampling_strategy: "first:10%"
+  - json_path: /PATH/TO/LLaVA-Video/30_60_s_academic_mc_v0_1_qa_processed.json
+    sampling_strategy: "first:10%"
+  - json_path: /PATH/TO/LLaVA-Video/30_60_s_youtube_oe_v0_1_qa_processed.json
+    sampling_strategy: "first:10%"
+  - json_path: /PATH/TO/LLaVA-Video/30_60_s_youtube_mc_v0_1_qa_processed.json
+    sampling_strategy: "first:10%"
+  # - json_path: /PATH/TO/LLaVA-Video/30_60_s_activitynetqa_oe_qa_processed.json
+    # sampling_strategy: "first:10%"
+  # - json_path: /PATH/TO/LLaVA-Video/30_60_s_nextqa_oe_qa_processed.json
+    # sampling_strategy: "first:10%"
+  # - json_path: /PATH/TO/LLaVA-Video/30_60_s_nextqa_mc_qa_processed.json
+    # sampling_strategy: "first:10%"
+  # - json_path: /PATH/TO/LLaVA-Video/30_60_s_perceptiontest_mc_qa_processed.json
+    # sampling_strategy: "first:10%"
+  # - json_path: /PATH/TO/LLaVA-Video/1_2_m_academic_oe_v0_1_qa_processed.json
+  #   sampling_strategy: "first:10%"
+  # - json_path: /PATH/TO/LLaVA-Video/1_2_m_academic_mc_v0_1_qa_processed.json
+  #   sampling_strategy: "first:10%"
+  # - json_path: /PATH/TO/LLaVA-Video/1_2_m_youtube_oe_v0_1_qa_processed.json
+  #   sampling_strategy: "first:10%"
+  # - json_path: /PATH/TO/LLaVA-Video/1_2_m_youtube_mc_v0_1_qa_processed.json
+  #   sampling_strategy: "first:10%"
+  # - json_path: /PATH/TO/LLaVA-Video/1_2_m_activitynetqa_oe_qa_processed.json
+  #   sampling_strategy: "first:10%"
+  # - json_path: /PATH/TO/LLaVA-Video/1_2_m_nextqa_oe_qa_processed.json
+  #   sampling_strategy: "first:10%"
+  # - json_path: /PATH/TO/LLaVA-Video/1_2_m_nextqa_mc_qa_processed.json
+  #   sampling_strategy: "first:10%"
+  # # - json_path: /PATH/TO/LLaVA-Video/sharegptvideo_qa_255k_processed.json
+  #   # sampling_strategy: "first:10%"
+  # - json_path: /PATH/TO/LLaVA-Video/2_3_m_academic_v0_1_cap_processed.json
+  #   sampling_strategy: "first:10%"
+  # - json_path: /PATH/TO/LLaVA-Video/2_3_m_youtube_v0_1_cap_processed.json
+  #   sampling_strategy: "first:10%"
+  # - json_path: /PATH/TO/LLaVA-Video/2_3_m_academic_oe_v0_1_qa_processed.json
+  #   sampling_strategy: "first:10%"
+  # - json_path: /PATH/TO/LLaVA-Video/2_3_m_academic_mc_v0_1_qa_processed.json
+  #   sampling_strategy: "first:10%"
+  # - json_path: /PATH/TO/LLaVA-Video/2_3_m_youtube_oe_v0_1_qa_processed.json
+  #   sampling_strategy: "first:10%"
+  # - json_path: /PATH/TO/LLaVA-Video/2_3_m_youtube_mc_v0_1_qa_processed.json
+  #   sampling_strategy: "first:10%"
+  # - json_path: /PATH/TO/LLaVA-Video/2_3_m_nextqa_oe_qa_processed.json
+  #   sampling_strategy: "first:10%"
+  # - json_path: /PATH/TO/LLaVA-Video/2_3_m_nextqa_mc_qa_processed.json
+  #   sampling_strategy: "first:10%"
+  # - json_path: /PATH/TO/LLaVA-Video/2_3_m_activitynetqa_oe_qa_processed.json
+  #   sampling_strategy: "first:10%"

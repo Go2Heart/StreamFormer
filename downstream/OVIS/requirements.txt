@@ -1,0 +1,12 @@
+einops
+cython
+scipy
+shapely
+timm
+h5py
+submitit
+scikit-image
+opencv-python
+addict
+Pillow==8.2.0
+setuptools==58.2.0 

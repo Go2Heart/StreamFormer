@@ -11,7 +11,7 @@ from timm.models.layers import DropPath, trunc_normal_
 from torch import nn
 from transformers.modeling_outputs import BaseModelOutput
 
-from models.vis.mask2former.modeling.pixel_decoder.ops.modules import MSDeformAttn
+from downstream.OVIS.mask2former.modeling.pixel_decoder.ops.modules import MSDeformAttn
 
 from .modeling_timesformer_siglip import *
 
@@ -456,7 +456,7 @@ class TimesformerMultiTaskingModelSigLIPViTAdapter(TimesformerPreTrainedModel):
 
     def __init__(
         self,
-        config,
+        config=StreamformerConfig(),
         pretrain_size=224,
         conv_inplane=64,
         n_points=4,

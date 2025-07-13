@@ -1,5 +1,5 @@
 export CUDA_VISIBLE_DEVICES=1
-task_config=all
+task_config=k400
 frame_num=16
 
 mkdir -p logs/frame$frame_num/siglip_multi_task_grad_accu_balance_$task_config
@@ -11,14 +11,14 @@ torchrun --master_port 52544 --nnodes 1 --nproc_per_node 1 --node_rank 0  run_fi
     --batch_size 16 \
     --num_workers 8 \
     --pin_mem \
-    --pretrained_model /mnt/vision_user/yibinyan/StreamFormer-3D/checkpoints/timesformer-siglip-16 \
+    --pretrained_model /PATH/TO/PRETRAINED/timesformer-siglip-16 \
     --world_size 1 \
     --local_rank 0 \
     --num_sample 1 \
     --aa rand-m7-n4-mstd0.5-inc1 \
     --train_interpolation bicubic \
     --sampler_type balanced \
-    --update_freq 3 \
+    --update_freq 7 \
     --epochs 20 \
     --warmup_lr 0 \
     --lr 2e-5 \
