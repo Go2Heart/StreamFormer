@@ -37,10 +37,12 @@ bash scripts/pretrain_streamformer.sh
 
 
 ### Evaluations
-1. OAD
-Check OAD [README](downstream/OAD/README.md).
+#### 1. OAD
 
-2. OVIS
+Check the [README](downstream/OAD/README.md) of OAD.
+
+#### 2. OVIS
+
 Follow the [README](downstream/OVIS/README.md) of CTVIS to install the corresponding environment.
 
 Train Streamformer for OVIS.
@@ -49,7 +51,8 @@ export DETECTRON2_DATASETS=/PATH/TO/VIS/DATA;
 python -m downstream.OVIS.train_ctvis --resume --config-file downstream/OVIS/configs/ytvis_2019/CTVIS_Streamformer.yaml --num-gpus 4
 ```
 
-3. VideoQA
+#### 3. VideoQA
+
 Follow the [README](downstream/VideoQA/README.md) of LLaVA-NeXT to install the corresponding environment.
 
 Prepare the necessary data:
