@@ -1,10 +1,10 @@
 export CUDA_VISIBLE_DEVICES=1
-task_config=k400
+task_config=all
 frame_num=16
 
 mkdir -p logs/frame$frame_num/siglip_multi_task_grad_accu_balance_$task_config
 
-torchrun --master_port 52544 --nnodes 1 --nproc_per_node 1 --node_rank 0  run_finetuning_multi_task.py \
+torchrun --master_port 52544 --nnodes 1 --nproc_per_node 8 --node_rank 0  run_finetuning_multi_task.py \
     --multi_tasks_metadata scripts/dataset_metadata/$task_config.yaml \
     --init_vit siglip \
     --use_decord \
@@ -35,4 +35,3 @@ torchrun --master_port 52544 --nnodes 1 --nproc_per_node 1 --node_rank 0  run_fi
     --log_dir logs/frame$frame_num/siglip_multi_task_grad_accu_balance_$task_config \
     2>&1 | tee logs/frame$frame_num/siglip_multi_task_grad_accu_balance_$task_config/test.log
     # --do_eval \
-    # --ckpt_path /inspire/ssd/ws-f4d69b29-e0a5-44e6-bd92-acf4de9990f0/public-project/yanyibin-240108100044/outputs/siglip_multi_task_frame8_youtube_vis_LVVIS/checkpoint-epoch_2.pth \
