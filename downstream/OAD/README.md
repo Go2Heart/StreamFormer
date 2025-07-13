@@ -1,4 +1,4 @@
-# Streamformer Online Action Detection
+# StreamFormer Online Action Detection
 
 ## Introduction
 
@@ -94,17 +94,6 @@ Note that we use the first online evaluation mode in MAT for simplicity, where e
 |       method      | visual feature   |  mAP  (%)  |                             config                                                |   checkpoint   |
 |  :--------------: |  :-------------:  |  :-----:  |  :-----------------------------------------------------------------------------:  |  :----------:  |
 |  MAT (without flow)          |    Streamformer   |   87.8    | [yaml](configs/TVSeries/MAT/streamformer_multitask_without_flow.yaml)      | [Download](xxx) |
-
-## Citations
-
-If you are using the data/code/model provided here in a publication, please cite the paper:
-```
-xxx
-```
-## License
-
-This project is licensed under the Apache-2.0 License.
-
 ## Acknowledgements
 
 This codebase is built upon [`MAT`](https://github.com/Echo0125/MAT-Memory-and-Anticipation-Transformer/tree/main/).
