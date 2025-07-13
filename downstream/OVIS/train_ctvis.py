@@ -1,8 +1,10 @@
 try:
     # ignore ShapelyDeprecationWarning from fvcore
-    from shapely.errors import ShapelyDeprecationWarning
     import warnings
-    warnings.filterwarnings('ignore')
+
+    from shapely.errors import ShapelyDeprecationWarning
+
+    warnings.filterwarnings("ignore")
 except ImportError:
     pass
 
@@ -10,23 +12,23 @@ import copy
 import itertools
 import logging
 import os
+import weakref
 from collections import OrderedDict
 from typing import Any, Dict, List, Set
 
-import torch
-import weakref
 import detectron2.utils.comm as comm
+import torch
 from detectron2.checkpoint import DetectionCheckpointer
 from detectron2.config import get_cfg
 from detectron2.data import MetadataCatalog
 from detectron2.engine import (
+    AMPTrainer,
     DefaultTrainer,
+    SimpleTrainer,
+    create_ddp_model,
     default_argument_parser,
     default_setup,
     launch,
-    create_ddp_model,
-    AMPTrainer,
-    SimpleTrainer
 )
 from detectron2.evaluation import (
     DatasetEvaluator,
@@ -38,15 +40,18 @@ from detectron2.projects.deeplab import add_deeplab_config, build_lr_scheduler  
 from detectron2.solver.build import maybe_add_gradient_clipping
 from detectron2.utils.logger import setup_logger
 
+from .ctvis import (
+    RotateCOCOVideoDatasetMapper,
+    YTVISDatasetMapper,
+    YTVISEvaluator,
+    add_ctvis_config,
+    build_combined_loader,
+    build_detection_test_loader,
+    build_detection_train_loader,
+)
+
 # MaskFormer
 from .mask2former import add_maskformer2_config
-from .ctvis import (add_ctvis_config,
-                   YTVISDatasetMapper,
-                   YTVISEvaluator,
-                   RotateCOCOVideoDatasetMapper,
-                   build_combined_loader,
-                   build_detection_train_loader,
-                   build_detection_test_loader)
 
 
 class Trainer(DefaultTrainer):
@@ -70,7 +75,9 @@ class Trainer(DefaultTrainer):
         optimizer = self.build_optimizer(cfg, model)
         data_loader = self.build_train_loader(cfg)
 
-        model = create_ddp_model(model, broadcast_buffers=False)#, find_unused_parameters=cfg.FIND_UNUSED_PARAMETERS)
+        model = create_ddp_model(
+            model, broadcast_buffers=False
+        )  # , find_unused_parameters=cfg.FIND_UNUSED_PARAMETERS)
         self._trainer = (AMPTrainer if cfg.SOLVER.AMP.ENABLED else SimpleTrainer)(
             model, data_loader, optimizer
         )
@@ -91,10 +98,10 @@ class Trainer(DefaultTrainer):
     @classmethod
     def build_evaluator(cls, cfg, dataset_name, output_folder=None):
         """
-            Create evaluator(s) for a given dataset.
-            This uses the special metadata "evaluator_type" associated with each builtin dataset.
-            For your own dataset, you can simply create an evaluator manually in your
-            script and do not have to worry about the hacky if-else logic here.
+        Create evaluator(s) for a given dataset.
+        This uses the special metadata "evaluator_type" associated with each builtin dataset.
+        For your own dataset, you can simply create an evaluator manually in your
+        script and do not have to worry about the hacky if-else logic here.
         """
         if output_folder is None:
             output_folder = os.path.join(cfg.OUTPUT_DIR, "inference")
@@ -111,10 +118,16 @@ class Trainer(DefaultTrainer):
         mappers = []
         # if dataset_name.startswith('coco'):
         for d_i, dataset_name in enumerate(cfg.DATASETS.TRAIN):
-            if dataset_name.startswith('coco'):
-                mappers.append(RotateCOCOVideoDatasetMapper(cfg, is_train=True, tgt_dataset_name=cfg.DATASETS.TRAIN[-1],
-                                                            src_dataset_name=dataset_name))  # noqa
-            elif dataset_name.startswith('ytvis') or dataset_name.startswith('ovis'):
+            if dataset_name.startswith("coco"):
+                mappers.append(
+                    RotateCOCOVideoDatasetMapper(
+                        cfg,
+                        is_train=True,
+                        tgt_dataset_name=cfg.DATASETS.TRAIN[-1],
+                        src_dataset_name=dataset_name,
+                    )
+                )  # noqa
+            elif dataset_name.startswith("ytvis") or dataset_name.startswith("ovis"):
                 mappers.append(YTVISDatasetMapper(cfg, is_train=True))
             else:
                 raise NotImplementedError
@@ -123,21 +136,27 @@ class Trainer(DefaultTrainer):
 
         if len(mappers) == 1:
             mapper = mappers[0]
-            return build_detection_train_loader(cfg, mapper=mapper, dataset_name=cfg.DATASETS.TRAIN[0])
+            return build_detection_train_loader(
+                cfg, mapper=mapper, dataset_name=cfg.DATASETS.TRAIN[0]
+            )
         else:
             loaders = [
-                build_detection_train_loader(cfg, mapper=mapper, dataset_name=dataset_name)
+                build_detection_train_loader(
+                    cfg, mapper=mapper, dataset_name=dataset_name
+                )
                 for mapper, dataset_name in zip(mappers, cfg.DATASETS.TRAIN)
             ]
-            combined_data_loader = build_combined_loader(cfg, loaders, cfg.DATASETS.DATASET_RATIO)
+            combined_data_loader = build_combined_loader(
+                cfg, loaders, cfg.DATASETS.DATASET_RATIO
+            )
             return combined_data_loader
 
     @classmethod
     def build_test_loader(cls, cfg, dataset_name):
         dataset_name = cfg.DATASETS.TEST[0]
-        if dataset_name.startswith('coco'):
+        if dataset_name.startswith("coco"):
             raise NotImplementedError
-        elif dataset_name.startswith('ytvis') or dataset_name.startswith('ovis'):
+        elif dataset_name.startswith("ytvis") or dataset_name.startswith("ovis"):
             mapper = YTVISDatasetMapper(cfg, is_train=False)
         return build_detection_test_loader(cfg, dataset_name, mapper=mapper)
 
@@ -185,15 +204,19 @@ class Trainer(DefaultTrainer):
 
                 hyperparams = copy.copy(defaults)
                 if "backbone" in module_name:
-                    hyperparams["lr"] = hyperparams["lr"] * cfg.SOLVER.BACKBONE_MULTIPLIER
+                    hyperparams["lr"] = (
+                        hyperparams["lr"] * cfg.SOLVER.BACKBONE_MULTIPLIER
+                    )
                 elif "reid_embed" not in module_name:
-                    hyperparams["lr"] = hyperparams["lr"] * cfg.SOLVER.DETECTOR_MULTIPLIER
+                    hyperparams["lr"] = (
+                        hyperparams["lr"] * cfg.SOLVER.DETECTOR_MULTIPLIER
+                    )
                 else:
                     assert "reid_embed" in module_name, "Build optimizer failed!"
 
                 if (
-                        "relative_position_bias_table" in module_param_name
-                        or "absolute_pos_embed" in module_param_name
+                    "relative_position_bias_table" in module_param_name
+                    or "absolute_pos_embed" in module_param_name
                 ):
                     print(module_param_name)
                     hyperparams["weight_decay"] = 0.0
@@ -207,14 +230,16 @@ class Trainer(DefaultTrainer):
             # detectron2 doesn't have full model gradient clipping now
             clip_norm_val = cfg.SOLVER.CLIP_GRADIENTS.CLIP_VALUE
             enable = (
-                    cfg.SOLVER.CLIP_GRADIENTS.ENABLED
-                    and cfg.SOLVER.CLIP_GRADIENTS.CLIP_TYPE == "full_model"
-                    and clip_norm_val > 0.0
+                cfg.SOLVER.CLIP_GRADIENTS.ENABLED
+                and cfg.SOLVER.CLIP_GRADIENTS.CLIP_TYPE == "full_model"
+                and clip_norm_val > 0.0
             )
 
             class FullModelGradientClippingOptimizer(optim):
                 def step(self, closure=None):
-                    all_params = itertools.chain(*[x["params"] for x in self.param_groups])
+                    all_params = itertools.chain(
+                        *[x["params"] for x in self.param_groups]
+                    )
                     torch.nn.utils.clip_grad_norm_(all_params, clip_norm_val)
                     super().step(closure=closure)
 
@@ -250,6 +275,7 @@ class Trainer(DefaultTrainer):
             dict: a dict of result metrics
         """
         from torch.cuda.amp import autocast
+
         logger = logging.getLogger(__name__)
         if isinstance(evaluators, DatasetEvaluator):
             evaluators = [evaluators]
@@ -284,7 +310,9 @@ class Trainer(DefaultTrainer):
                 ), "Evaluator must return a dict on the main process. Got {} instead.".format(
                     results_i
                 )
-                logger.info("Evaluation results for {} in csv format:".format(dataset_name))
+                logger.info(
+                    "Evaluation results for {} in csv format:".format(dataset_name)
+                )
                 print_csv_format(results_i)
 
         if len(results) == 1:
@@ -338,4 +366,5 @@ if __name__ == "__main__":
         num_machines=args.num_machines,
         machine_rank=args.machine_rank,
         dist_url=args.dist_url,
-        args=(args,))
+        args=(args,),
+    )

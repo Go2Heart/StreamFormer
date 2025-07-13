@@ -15,19 +15,32 @@
 """TimeSformerV2 built upon PyTorch TimeSformer model."""
 import collections
 import collections.abc
-from dataclasses import dataclass
+import copy
+import math
 import types
+from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple, Union
 
-import math
-import copy
 import torch
 import torch.nn.functional
 import torch.utils.checkpoint
 from torch import nn
 from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
+from transformers import (
+    AutoTokenizer,
+    CLIPConfig,
+    CLIPTextConfig,
+    CLIPTextModel,
+    SiglipConfig,
+    SiglipTextModel,
+)
 from transformers.activations import ACT2FN
-from transformers.modeling_outputs import BaseModelOutput, ImageClassifierOutput, BaseModelOutputWithPooling, ModelOutput
+from transformers.modeling_outputs import (
+    BaseModelOutput,
+    BaseModelOutputWithPooling,
+    ImageClassifierOutput,
+    ModelOutput,
+)
 from transformers.modeling_utils import PreTrainedModel
 from transformers.utils import (
     add_start_docstrings,
@@ -35,21 +48,15 @@ from transformers.utils import (
     logging,
     replace_return_docstrings,
 )
-from transformers import CLIPTextModel, CLIPTextConfig, AutoTokenizer, CLIPConfig, SiglipTextModel, SiglipConfig
 
 # from .configuration_timesformerV2 import TimesformerV2Config
 """ TimeSformer model configuration"""
 
-from transformers.configuration_utils import PretrainedConfig
-from transformers.utils import logging
+from functools import partial, reduce
 
-from transformers.image_processing_utils import BatchFeature, get_size_dict
-from transformers.image_utils import (
-    ChannelDimension,
-    PILImageResampling,
-    to_numpy_array,
-)
 from PIL import Image
+from transformers.configuration_utils import PretrainedConfig
+from transformers.image_processing_utils import BatchFeature, get_size_dict
 from transformers.image_transforms import (
     convert_to_rgb,
     normalize,
@@ -57,7 +64,12 @@ from transformers.image_transforms import (
     resize,
     to_channel_dimension_format,
 )
-from functools import partial, reduce
+from transformers.image_utils import (
+    ChannelDimension,
+    PILImageResampling,
+    to_numpy_array,
+)
+from transformers.utils import logging
 
 logger = logging.get_logger(__name__)
 
@@ -173,6 +185,8 @@ class StreamformerConfig(PretrainedConfig):
         self.drop_path_rate = drop_path_rate
         self.clip_config = clip_config
         self.enable_causal_temporal = enable_causal_temporal
+
+
 _CONFIG_FOR_DOC = "TimesformerConfig"
 logger = logging.get_logger(__name__)
 
@@ -181,10 +195,12 @@ TIMESFORMER_PRETRAINED_MODEL_ARCHIVE_LIST = [
     # See all TimeSformer models at https://huggingface.co/models?filter=timesformer
 ]
 
-from torch import distributed as dist 
-has_distributed = True 
+from torch import distributed as dist
+
+has_distributed = True
 import torch.nn.functional as F
 from llava.utils import rank0_print
+
 
 class TimesformerPatchEmbeddings(nn.Module):
     """Image to Patch Embedding"""
@@ -343,6 +359,8 @@ class TimesformerEmbeddingsSigLIP(nn.Module):
             )  # (B, N*T, D)
 
         return embeddings  # (B, N*T, D)
+
+
 # Copied from transformers.models.beit.modeling_beit.drop_path
 def drop_path(
     input: torch.Tensor, drop_prob: float = 0.0, training: bool = False
@@ -384,6 +402,7 @@ class TimeSformerDropPath(nn.Module):
     def extra_repr(self) -> str:
         return "p={}".format(self.drop_prob)
 
+
 class TimesformerCausalSelfAttention(nn.Module):
     def __init__(self, config: StreamformerConfig):
         super().__init__()
@@ -397,30 +416,40 @@ class TimesformerCausalSelfAttention(nn.Module):
         self.scale = head_dim**-0.5
         self.qkv = nn.Linear(config.hidden_size, config.hidden_size * 3, bias=qkv_bias)
         self.attn_drop = nn.Dropout(attention_dropout_prob)
-        self.register_buffer("mask", torch.tril(torch.ones(config.num_frames, config.num_frames)))
-        
+        self.register_buffer(
+            "mask", torch.tril(torch.ones(config.num_frames, config.num_frames))
+        )
+
     def _add_lora(self, lora_rank):
         # freeze the qkv layer
         for param in self.qkv.parameters():
             param.requires_grad = False
-            
+
         self.qkv_lora_a = nn.Linear(self.qkv.in_features, lora_rank, bias=False)
-        self.qkv_lora_b = nn.Linear(lora_rank, self.qkv.out_features,  bias=False)
-        self.add_module('qkv_lora_a', self.qkv_lora_a)
-        self.add_module('qkv_lora_b', self.qkv_lora_b)
+        self.qkv_lora_b = nn.Linear(lora_rank, self.qkv.out_features, bias=False)
+        self.add_module("qkv_lora_a", self.qkv_lora_a)
+        self.add_module("qkv_lora_b", self.qkv_lora_b)
         # move to device
         self.qkv_lora_a.to(self.qkv.weight.device)
         self.qkv_lora_b.to(self.qkv.weight.device)
-        
+
         # initialize the lora projection a with gaussian noise and b with zeros
         nn.init.normal_(self.qkv_lora_a.weight, std=0.02)
         nn.init.zeros_(self.qkv_lora_b.weight)
+
         def lora_forward(self, hidden_states, output_attentions: bool = False):
             batch_size, hidden_size, num_channels = hidden_states.shape
             qkv = (
-                (self.qkv(hidden_states) + self.qkv_lora_b(self.qkv_lora_a(hidden_states)))
+                (
+                    self.qkv(hidden_states)
+                    + self.qkv_lora_b(self.qkv_lora_a(hidden_states))
+                )
                 .reshape(
-                    batch_size, hidden_size, 3, self.num_heads, num_channels // self.num_heads
+                    batch_size,
+                    hidden_size,
+                    3,
+                    self.num_heads,
+                    num_channels // self.num_heads,
                 )  # B x C x 3 x num_heads x head_dim
                 .permute(2, 0, 3, 1, 4)  # 3 x B x num_heads x C x head_dim
             )
@@ -437,19 +466,26 @@ class TimesformerCausalSelfAttention(nn.Module):
             )
 
             outputs = (
-                (context_layer, attention_probs) if output_attentions else (context_layer,)
+                (context_layer, attention_probs)
+                if output_attentions
+                else (context_layer,)
             )
 
             return outputs
+
         # replace the forward method with the lora_forward method
         self.forward = types.MethodType(lora_forward, self)
-        
+
     def forward(self, hidden_states, output_attentions: bool = False):
         batch_size, hidden_size, num_channels = hidden_states.shape  # (B*H*W) x T x C
         qkv = (
             self.qkv(hidden_states)
             .reshape(
-                batch_size, hidden_size, 3, self.num_heads, num_channels // self.num_heads
+                batch_size,
+                hidden_size,
+                3,
+                self.num_heads,
+                num_channels // self.num_heads,
             )  # B x T x 3 x num_heads x head_dim
             .permute(2, 0, 3, 1, 4)  # 3 x B x num_heads x T x head_dim
         )
@@ -459,8 +495,14 @@ class TimesformerCausalSelfAttention(nn.Module):
 
         # causal mask
         num_frames = hidden_states.shape[1]
-        mask = torch.tril(torch.ones(num_frames, num_frames, device=attention_scores.device, dtype=torch.bool))
-        attention_scores = attention_scores.masked_fill(mask == 0, float("-inf")) # mask out future frames
+        mask = torch.tril(
+            torch.ones(
+                num_frames, num_frames, device=attention_scores.device, dtype=torch.bool
+            )
+        )
+        attention_scores = attention_scores.masked_fill(
+            mask == 0, float("-inf")
+        )  # mask out future frames
         attention_probs = attention_scores.softmax(dim=-1)
         attention_probs = self.attn_drop(attention_probs)
 
@@ -475,6 +517,8 @@ class TimesformerCausalSelfAttention(nn.Module):
         )
 
         return outputs
+
+
 class TimesformerSelfAttention(nn.Module):
     def __init__(self, config: StreamformerConfig):
         super().__init__()
@@ -493,24 +537,32 @@ class TimesformerSelfAttention(nn.Module):
         # freeze the qkv layer
         for param in self.qkv.parameters():
             param.requires_grad = False
-            
+
         self.qkv_lora_a = nn.Linear(self.qkv.in_features, lora_rank, bias=False)
-        self.qkv_lora_b = nn.Linear(lora_rank, self.qkv.out_features,  bias=False)
-        self.add_module('qkv_lora_a', self.qkv_lora_a)
-        self.add_module('qkv_lora_b', self.qkv_lora_b)
+        self.qkv_lora_b = nn.Linear(lora_rank, self.qkv.out_features, bias=False)
+        self.add_module("qkv_lora_a", self.qkv_lora_a)
+        self.add_module("qkv_lora_b", self.qkv_lora_b)
         # move to device
         self.qkv_lora_a.to(self.qkv.weight.device)
         self.qkv_lora_b.to(self.qkv.weight.device)
-        
+
         # initialize the lora projection a with gaussian noise and b with zeros
         nn.init.normal_(self.qkv_lora_a.weight, std=0.02)
         nn.init.zeros_(self.qkv_lora_b.weight)
+
         def lora_forward(self, hidden_states, output_attentions: bool = False):
             batch_size, hidden_size, num_channels = hidden_states.shape
             qkv = (
-                (self.qkv(hidden_states) + self.qkv_lora_b(self.qkv_lora_a(hidden_states)))
+                (
+                    self.qkv(hidden_states)
+                    + self.qkv_lora_b(self.qkv_lora_a(hidden_states))
+                )
                 .reshape(
-                    batch_size, hidden_size, 3, self.num_heads, num_channels // self.num_heads
+                    batch_size,
+                    hidden_size,
+                    3,
+                    self.num_heads,
+                    num_channels // self.num_heads,
                 )  # B x C x 3 x num_heads x head_dim
                 .permute(2, 0, 3, 1, 4)  # 3 x B x num_heads x C x head_dim
             )
@@ -527,19 +579,26 @@ class TimesformerSelfAttention(nn.Module):
             )
 
             outputs = (
-                (context_layer, attention_probs) if output_attentions else (context_layer,)
+                (context_layer, attention_probs)
+                if output_attentions
+                else (context_layer,)
             )
 
             return outputs
+
         # replace the forward method with the lora_forward method
         self.forward = types.MethodType(lora_forward, self)
-    
+
     def forward(self, hidden_states, output_attentions: bool = False):
         batch_size, hidden_size, num_channels = hidden_states.shape  # B x N x C
         qkv = (
             self.qkv(hidden_states)
             .reshape(
-                batch_size, hidden_size, 3, self.num_heads, num_channels // self.num_heads
+                batch_size,
+                hidden_size,
+                3,
+                self.num_heads,
+                num_channels // self.num_heads,
             )  # B x C x 3 x num_heads x head_dim
             .permute(2, 0, 3, 1, 4)  # 3 x B x num_heads x C x head_dim
         )
@@ -572,28 +631,32 @@ class TimesformerSelfOutput(nn.Module):
         super().__init__()
         self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
-        
+
     def _add_lora(self, lora_rank: int = 32):
         # freeze the dense layer
         for param in self.dense.parameters():
             param.requires_grad = False
         self.dense_lora_a = nn.Linear(self.dense.in_features, lora_rank, bias=False)
         self.dense_lora_b = nn.Linear(lora_rank, self.dense.out_features, bias=False)
-        self.add_module('dense_lora_a', self.dense_lora_a)
-        self.add_module('dense_lora_b', self.dense_lora_b)
-        
+        self.add_module("dense_lora_a", self.dense_lora_a)
+        self.add_module("dense_lora_b", self.dense_lora_b)
+
         # move to device
         self.dense_lora_a.to(self.dense.weight.device)
         self.dense_lora_b.to(self.dense.weight.device)
-        
+
         # initialize the lora projection a with gaussian noise and b with zeros
         nn.init.normal_(self.dense_lora_a.weight, std=0.02)
         nn.init.zeros_(self.dense_lora_b.weight)
+
         def lora_forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
-            hidden_states = self.dense(hidden_states) + self.dense_lora_b(self.dense_lora_a(hidden_states))
+            hidden_states = self.dense(hidden_states) + self.dense_lora_b(
+                self.dense_lora_a(hidden_states)
+            )
             hidden_states = self.dropout(hidden_states)
 
             return hidden_states
+
         # replace the forward method with the lora_forward method
         self.forward = types.MethodType(lora_forward, self)
 
@@ -602,6 +665,7 @@ class TimesformerSelfOutput(nn.Module):
         hidden_states = self.dropout(hidden_states)
 
         return hidden_states
+
 
 class TimeSformerCausalAttention(nn.Module):
     def __init__(self, config: StreamformerConfig) -> None:
@@ -622,7 +686,8 @@ class TimeSformerCausalAttention(nn.Module):
             1:
         ]  # add attentions if we output them
         return outputs
-    
+
+
 class TimeSformerAttention(nn.Module):
     def __init__(self, config: StreamformerConfig) -> None:
         super().__init__()
@@ -642,8 +707,8 @@ class TimeSformerAttention(nn.Module):
             1:
         ]  # add attentions if we output them
         return outputs
-    
-    
+
+
 class TimesformerIntermediate(nn.Module):
     def __init__(self, config: StreamformerConfig) -> None:
         super().__init__()
@@ -661,8 +726,8 @@ class TimesformerIntermediate(nn.Module):
         hidden_states = self.dropout(hidden_states)
 
         return hidden_states
-    
-    
+
+
 class TimesformerOutput(nn.Module):
     def __init__(self, config: StreamformerConfig) -> None:
         super().__init__()
@@ -674,7 +739,8 @@ class TimesformerOutput(nn.Module):
         hidden_states = self.dropout(hidden_states)
 
         return hidden_states
-    
+
+
 class TimesformerLayerSigLIP(nn.Module):
     def __init__(self, config: StreamformerConfig, layer_index: int) -> None:
         super().__init__()
@@ -682,25 +748,40 @@ class TimesformerLayerSigLIP(nn.Module):
         attention_type = config.attention_type
 
         drop_path_rates = [
-            x.item() for x in torch.linspace(0, config.drop_path_rate, config.num_hidden_layers)
+            x.item()
+            for x in torch.linspace(0, config.drop_path_rate, config.num_hidden_layers)
         ]  # stochastic depth decay rule
         drop_path_rate = drop_path_rates[layer_index]
 
-        self.drop_path = TimeSformerDropPath(drop_path_rate) if drop_path_rate > 0.0 else nn.Identity()
+        self.drop_path = (
+            TimeSformerDropPath(drop_path_rate)
+            if drop_path_rate > 0.0
+            else nn.Identity()
+        )
         self.attention = TimeSformerAttention(config)
         self.intermediate = TimesformerIntermediate(config)
         self.output = TimesformerOutput(config)
-        self.layernorm_before = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
-        self.layernorm_after = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
+        self.layernorm_before = nn.LayerNorm(
+            config.hidden_size, eps=config.layer_norm_eps
+        )
+        self.layernorm_after = nn.LayerNorm(
+            config.hidden_size, eps=config.layer_norm_eps
+        )
 
         self.config = config
         self.attention_type = attention_type
-        if attention_type not in ["divided_space_time", "space_only", "joint_space_time"]:
+        if attention_type not in [
+            "divided_space_time",
+            "space_only",
+            "joint_space_time",
+        ]:
             raise ValueError("Unknown attention type: {}".format(attention_type))
 
         # Temporal Attention Parameters
         if self.attention_type == "divided_space_time":
-            self.temporal_layernorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
+            self.temporal_layernorm = nn.LayerNorm(
+                config.hidden_size, eps=config.layer_norm_eps
+            )
             if config.enable_causal_temporal:
                 self.temporal_attention = TimeSformerCausalAttention(config)
             elif not config.enable_causal_temporal:
@@ -708,8 +789,13 @@ class TimesformerLayerSigLIP(nn.Module):
             self.temporal_dense = nn.Linear(config.hidden_size, config.hidden_size)
             self.temporal_attention_gating = nn.Parameter(torch.tensor(0.0))
             # self.register_parameter("temporal_attention_gating", nn.Parameter(torch.tensor(0.0)))
-            
-    def forward(self, hidden_states: torch.Tensor, num_frames: int, output_attentions: bool = False):
+
+    def forward(
+        self,
+        hidden_states: torch.Tensor,
+        num_frames: int,
+        output_attentions: bool = False,
+    ):
         # hidden_states: (B, N*T, D)
 
         # num_frames = self.config.num_frames
@@ -717,13 +803,16 @@ class TimesformerLayerSigLIP(nn.Module):
         batch_size = hidden_states.shape[0]
         # num_spatial_tokens = (hidden_states.size(1)) // num_frames # siglip has no cls token
         # num_patch_height = num_spatial_tokens // num_patch_width
-        
+
         if self.attention_type in ["space_only", "joint_space_time"]:
             self_attention_outputs = self.attention(
-                self.layernorm_before(hidden_states), output_attentions=output_attentions
+                self.layernorm_before(hidden_states),
+                output_attentions=output_attentions,
             )
             attention_output = self_attention_outputs[0]
-            outputs = self_attention_outputs[1:]  # add self attentions if we output attention weights
+            outputs = self_attention_outputs[
+                1:
+            ]  # add self attentions if we output attention weights
 
             hidden_states = hidden_states + self.drop_path(attention_output)
 
@@ -737,30 +826,39 @@ class TimesformerLayerSigLIP(nn.Module):
             return outputs
         elif self.attention_type == "divided_space_time":
             # Temporal Attention
-            
-            temporal_embedding = hidden_states # siglip has no need to remove cls token
-            temporal_embedding = temporal_embedding.reshape(-1, num_frames, temporal_embedding.shape[2])  # (B*N, T, D)
+
+            temporal_embedding = hidden_states  # siglip has no need to remove cls token
+            temporal_embedding = temporal_embedding.reshape(
+                -1, num_frames, temporal_embedding.shape[2]
+            )  # (B*N, T, D)
             # temporal_embedding = temporal_embedding.reshape(
             #     batch_size, num_patch_height, num_patch_width, num_frames, temporal_embedding.shape[2]
             # ).reshape(batch_size * num_patch_height * num_patch_width, num_frames, temporal_embedding.shape[2]) # (B*N, T, D) s.t. temporal attension is applied to the same patch within frames
-            
+
             temporal_attention_outputs = self.temporal_attention(
                 self.temporal_layernorm(temporal_embedding),
             )
-            attention_output = temporal_attention_outputs[0] # (B*N, T, D) only the attention output wanted
-            
+            attention_output = temporal_attention_outputs[
+                0
+            ]  # (B*N, T, D) only the attention output wanted
+
             residual_temporal = self.drop_path(attention_output)  # (B*N, T, D)
             # residual_temporal = residual_temporal.reshape(
             #     batch_size, num_patch_height, num_patch_width, num_frames,
             #     residual_temporal.shape[2]
             # ).reshape(batch_size, num_patch_height * num_patch_width * num_frames, residual_temporal.shape[2])
-            residual_temporal = residual_temporal.reshape(batch_size, -1, residual_temporal.shape[2])  # (B, N*T, D)
+            residual_temporal = residual_temporal.reshape(
+                batch_size, -1, residual_temporal.shape[2]
+            )  # (B, N*T, D)
             residual_temporal = self.temporal_dense(residual_temporal)
-            temporal_embedding = hidden_states + self.temporal_attention_gating.tanh() * residual_temporal  # (B, N*T, D)
-            
+            temporal_embedding = (
+                hidden_states
+                + self.temporal_attention_gating.tanh() * residual_temporal
+            )  # (B, N*T, D)
+
             # Spatial
             # init_cls_token = hidden_states[:, 0, :].unsqueeze(1) # TODO check shape
-            # cls_token = init_cls_token.repeat(1, num_frames, 1) 
+            # cls_token = init_cls_token.repeat(1, num_frames, 1)
             # cls_token = cls_token.reshape(batch_size * num_frames, 1, cls_token.shape[2])
             spatial_embedding = temporal_embedding  # (B, N*T, D)
             # spatial_embedding = (
@@ -771,20 +869,26 @@ class TimesformerLayerSigLIP(nn.Module):
             #     .permute(0, 3, 1, 2, 4) # B x T x H x W x C
             #     .reshape(batch_size * num_frames, num_patch_height * num_patch_width, spatial_embedding.shape[2]) # (B x T) x (H x W) x C
             # )
-            spatial_embedding = spatial_embedding.reshape(
-                batch_size, -1, num_frames, spatial_embedding.shape[2]  # (B, N, T, D)
-                ).permute(0, 2, 1, 3  # (B, T, N, D)
-                ).reshape(batch_size * num_frames, -1, spatial_embedding.shape[2])  # (B*T, N, D)
-            
+            spatial_embedding = (
+                spatial_embedding.reshape(
+                    batch_size,
+                    -1,
+                    num_frames,
+                    spatial_embedding.shape[2],  # (B, N, T, D)
+                )
+                .permute(0, 2, 1, 3)  # (B, T, N, D)
+                .reshape(batch_size * num_frames, -1, spatial_embedding.shape[2])
+            )  # (B*T, N, D)
+
             spatial_attention_outputs = self.attention(
                 self.layernorm_before(spatial_embedding),
-                output_attentions=output_attentions
+                output_attentions=output_attentions,
             )
             attention_output = spatial_attention_outputs[0]  # (B*T, N, D)
-            outputs = spatial_attention_outputs[1:] # TODO check shape here, null?
-            
+            outputs = spatial_attention_outputs[1:]  # TODO check shape here, null?
+
             residual_spatial = self.drop_path(attention_output)  # (B*T, N, D)
-            
+
             # CLS token
             # cls_token = residual_spatial[:, 0, :]
             # cls_token = cls_token.reshape(batch_size, num_frames, cls_token.shape[1])
@@ -797,29 +901,41 @@ class TimesformerLayerSigLIP(nn.Module):
             #     .permute(0, 2, 3, 1, 4) # B x H x W x T x C
             #     .reshape(batch_size, num_patch_height * num_patch_width * num_frames, residual_spatial.shape[2]) # B x (H x W x T) x C
             # )
-            residual_spatial = residual_spatial.reshape(batch_size, num_frames, -1, residual_spatial.shape[2]  # (B, T, N, D)
-                ).permute(0, 2, 1, 3  # (B, N, T, D)
-                ).reshape(batch_size, -1, residual_spatial.shape[2])  # (B, N*T, D)
+            residual_spatial = (
+                residual_spatial.reshape(
+                    batch_size,
+                    num_frames,
+                    -1,
+                    residual_spatial.shape[2],  # (B, T, N, D)
+                )
+                .permute(0, 2, 1, 3)  # (B, N, T, D)
+                .reshape(batch_size, -1, residual_spatial.shape[2])
+            )  # (B, N*T, D)
             residual = residual_spatial
             hidden_states = temporal_embedding
-            
+
             # MLP
             hidden_states = hidden_states + residual
             layer_output = self.layernorm_after(hidden_states)
             layer_output = self.intermediate(layer_output)
             layer_output = self.output(layer_output)
             layer_output = hidden_states + self.drop_path(layer_output)
-            
+
             outputs = (layer_output,) + outputs
-            
+
             return outputs  # (B, N*T, D)
-            
-            
+
+
 class TimesformerEncoder(nn.Module):
     def __init__(self, config: StreamformerConfig) -> None:
         super().__init__()
         self.config = config
-        self.layer = nn.ModuleList([TimesformerLayerSigLIP(config, ind) for ind in range(config.num_hidden_layers)])
+        self.layer = nn.ModuleList(
+            [
+                TimesformerLayerSigLIP(config, ind)
+                for ind in range(config.num_hidden_layers)
+            ]
+        )
         self.gradient_checkpointing = False
 
     def forward(
@@ -845,7 +961,9 @@ class TimesformerEncoder(nn.Module):
                     output_attentions,
                 )
             else:
-                layer_outputs = layer_module(hidden_states, num_frames, output_attentions)
+                layer_outputs = layer_module(
+                    hidden_states, num_frames, output_attentions
+                )
 
             hidden_states = layer_outputs[0]
 
@@ -856,15 +974,18 @@ class TimesformerEncoder(nn.Module):
             all_hidden_states = all_hidden_states + (hidden_states,)
 
         if not return_dict:
-            return tuple(v for v in [hidden_states, all_hidden_states, all_self_attentions] if v is not None)
+            return tuple(
+                v
+                for v in [hidden_states, all_hidden_states, all_self_attentions]
+                if v is not None
+            )
         return BaseModelOutput(
             last_hidden_state=hidden_states,
             hidden_states=all_hidden_states,
             attentions=all_self_attentions,
         )
-            
 
-   
+
 class TimesformerPreTrainedModel(PreTrainedModel):
     """
     An abstract class to handle weights initialization and a simple interface for downloading and loading pretrained
@@ -885,10 +1006,12 @@ class TimesformerPreTrainedModel(PreTrainedModel):
             nn.init.constant_(module.bias, 0)
             nn.init.constant_(module.weight, 1.0)
         elif isinstance(module, TimesformerEmbeddingsSigLIP):
-            nn.init.normal_(module.position_embeddings, std=self.config.initializer_range)
+            nn.init.normal_(
+                module.position_embeddings, std=self.config.initializer_range
+            )
             module.patch_embeddings.apply(self._init_weights)
         elif isinstance(module, nn.Embedding):
-            nn.init.normal_(module.weight, mean=0.0, std=.02)
+            nn.init.normal_(module.weight, mean=0.0, std=0.02)
         elif isinstance(module, nn.BatchNorm1d):
             nn.init.constant_(module.weight, val=1.0)
             nn.init.constant_(module.bias.data, 0)
@@ -897,15 +1020,17 @@ class TimesformerPreTrainedModel(PreTrainedModel):
             if module.bias is not None:
                 nn.init.constant_(module.bias, 0)
         else:
-            if hasattr(module, 'weight') and module.weight is not None:
+            if hasattr(module, "weight") and module.weight is not None:
                 if module.weight.dim() > 1:
                     nn.init.kaiming_uniform_(module.weight)
                 else:
-                    nn.init.normal_(module.weight, mean=0.0, std=self.config.initializer_range)
-        
-            if hasattr(module, 'bias') and module.bias is not None:
+                    nn.init.normal_(
+                        module.weight, mean=0.0, std=self.config.initializer_range
+                    )
+
+            if hasattr(module, "bias") and module.bias is not None:
                 nn.init.constant_(module.bias, 0)
-        
+
 
 class SiglipMLP(nn.Module):
     def __init__(self, config):
@@ -920,7 +1045,8 @@ class SiglipMLP(nn.Module):
         hidden_states = self.activation_fn(hidden_states)
         hidden_states = self.fc2(hidden_states)
         return hidden_states
-    
+
+
 class TimesformerSiglipMultiheadAttentionPoolingHead(nn.Module):
     """Multihead Attention Pooling."""
 
@@ -928,7 +1054,9 @@ class TimesformerSiglipMultiheadAttentionPoolingHead(nn.Module):
         super().__init__()
 
         self.probe = nn.Parameter(torch.randn(1, 1, config.hidden_size))
-        self.attention = torch.nn.MultiheadAttention(config.hidden_size, config.num_attention_heads, batch_first=True)
+        self.attention = torch.nn.MultiheadAttention(
+            config.hidden_size, config.num_attention_heads, batch_first=True
+        )
         self.layernorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
         self.mlp = SiglipMLP(config)
 
@@ -937,7 +1065,9 @@ class TimesformerSiglipMultiheadAttentionPoolingHead(nn.Module):
         batch_size = hidden_state.shape[0]
         probe = self.probe.repeat(batch_size, 1, 1)
 
-        hidden_state = self.attention(probe, hidden_state, hidden_state)[0]  # (B*T, 1, D)
+        hidden_state = self.attention(probe, hidden_state, hidden_state)[
+            0
+        ]  # (B*T, 1, D)
 
         residual = hidden_state
         hidden_state = self.layernorm(hidden_state)
@@ -945,8 +1075,10 @@ class TimesformerSiglipMultiheadAttentionPoolingHead(nn.Module):
 
         return hidden_state[:, 0]  # (B*T, D)
 
+
 class TimesformerModelSigLIP(TimesformerPreTrainedModel):
     """A TimeSFormer utilizing SigLIP's pretrained weights."""
+
     def __init__(self, config):
         super().__init__(config)
         self.config = config
@@ -954,7 +1086,9 @@ class TimesformerModelSigLIP(TimesformerPreTrainedModel):
         self.embeddings = TimesformerEmbeddingsSigLIP(config)
         self.encoder = TimesformerEncoder(config)
         # self.pre_layernorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
-        self.post_layernorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
+        self.post_layernorm = nn.LayerNorm(
+            config.hidden_size, eps=config.layer_norm_eps
+        )
         self.head = TimesformerSiglipMultiheadAttentionPoolingHead(config)
 
         # Initialize weights and apply final processing
@@ -978,11 +1112,19 @@ class TimesformerModelSigLIP(TimesformerPreTrainedModel):
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
     ) -> Union[Tuple[torch.FloatTensor], BaseModelOutput]:
-        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
-        output_hidden_states = (
-            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        output_attentions = (
+            output_attentions
+            if output_attentions is not None
+            else self.config.output_attentions
         )
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        output_hidden_states = (
+            output_hidden_states
+            if output_hidden_states is not None
+            else self.config.output_hidden_states
+        )
+        return_dict = (
+            return_dict if return_dict is not None else self.config.use_return_dict
+        )
         embedding_output = self.embeddings(pixel_values)
 
         encoder_outputs = self.encoder(
@@ -993,9 +1135,21 @@ class TimesformerModelSigLIP(TimesformerPreTrainedModel):
         )
         sequence_output = encoder_outputs[0]
         sequence_output = self.post_layernorm(sequence_output)
-        pre_pool_output = sequence_output.view(sequence_output.size(0) * self.config.num_frames, -1, sequence_output.size(-1)) # reshape to (batch_size * num_frames, patch_num, hidden_size)
-        pooled_output = torch.mean(self.head(pre_pool_output).view(sequence_output.size(0), self.config.num_frames, sequence_output.size(-1)), 1, True).squeeze(1)
-        
+        pre_pool_output = sequence_output.view(
+            sequence_output.size(0) * self.config.num_frames,
+            -1,
+            sequence_output.size(-1),
+        )  # reshape to (batch_size * num_frames, patch_num, hidden_size)
+        pooled_output = torch.mean(
+            self.head(pre_pool_output).view(
+                sequence_output.size(0),
+                self.config.num_frames,
+                sequence_output.size(-1),
+            ),
+            1,
+            True,
+        ).squeeze(1)
+
         if not return_dict:
             return (sequence_output,) + encoder_outputs[1:]
         return BaseModelOutputWithPooling(
@@ -1005,8 +1159,10 @@ class TimesformerModelSigLIP(TimesformerPreTrainedModel):
             attentions=encoder_outputs.attentions,
         )
 
+
 class TimesformerMultiTaskingModelSigLIP(TimesformerPreTrainedModel):
     """A TimeSFormer utilizing SigLIP's pretrained weights."""
+
     def __init__(self, config):
         super().__init__(config)
         self.config = config
@@ -1014,7 +1170,9 @@ class TimesformerMultiTaskingModelSigLIP(TimesformerPreTrainedModel):
         self.embeddings = TimesformerEmbeddingsSigLIP(config)
         self.encoder = TimesformerEncoder(config)
         # self.pre_layernorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
-        self.post_layernorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
+        self.post_layernorm = nn.LayerNorm(
+            config.hidden_size, eps=config.layer_norm_eps
+        )
         self.head = TimesformerSiglipMultiheadAttentionPoolingHead(config)
         self.add_lora_spatial()
         # Initialize weights and apply final processing
@@ -1032,28 +1190,32 @@ class TimesformerMultiTaskingModelSigLIP(TimesformerPreTrainedModel):
             self.encoder.layer[layer].attention.prune_heads(heads)
 
     def add_lora_spatial(self):
-        assert self.encoder.layer[0].attention_type == "divided_space_time", "Please use divided_space_time attention type"
+        assert (
+            self.encoder.layer[0].attention_type == "divided_space_time"
+        ), "Please use divided_space_time attention type"
         name_list = []
         for name, module in self.encoder.layer.named_modules():
-            if 'temporal_attention' not in name and 'attention' in name:
+            if "temporal_attention" not in name and "attention" in name:
                 if isinstance(module, TimeSformerAttention):
                     name_list.append("timesformer.encoder.layer." + name)
                     module.attention._add_lora(32)
                     module.output._add_lora(32)
-        print("Added LoRA to the following layers: ", name_list) 
-    
+        print("Added LoRA to the following layers: ", name_list)
+
     def frozen_spatial(self):
-        assert self.encoder.layer[0].attention_type == "divided_space_time", "Please use divided_space_time attention type"
+        assert (
+            self.encoder.layer[0].attention_type == "divided_space_time"
+        ), "Please use divided_space_time attention type"
         name_list = []
         for name, module in self.encoder.layer.named_modules():
-            if 'temporal_attention' not in name and 'attention' in name:
+            if "temporal_attention" not in name and "attention" in name:
                 if isinstance(module, TimeSformerAttention):
                     name_list.append("timesformer.encoder.layer." + name)
                     for param in module.attention.qkv.parameters():
                         param.requires_grad = False
                     for param in module.attention.dense.parameters():
                         param.requires_grad = False
-        print("Freezing spatial attention to the following layers: ", name_list) 
+        print("Freezing spatial attention to the following layers: ", name_list)
 
     def forward(
         self,
@@ -1062,11 +1224,19 @@ class TimesformerMultiTaskingModelSigLIP(TimesformerPreTrainedModel):
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
     ) -> Union[Tuple[torch.FloatTensor], BaseModelOutput]:
-        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
-        output_hidden_states = (
-            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        output_attentions = (
+            output_attentions
+            if output_attentions is not None
+            else self.config.output_attentions
         )
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        output_hidden_states = (
+            output_hidden_states
+            if output_hidden_states is not None
+            else self.config.output_hidden_states
+        )
+        return_dict = (
+            return_dict if return_dict is not None else self.config.use_return_dict
+        )
         embedding_output = self.embeddings(pixel_values)  # (B, N*T, D)
         B, T, _, _, _ = pixel_values.shape
         encoder_outputs = self.encoder(
@@ -1081,17 +1251,24 @@ class TimesformerMultiTaskingModelSigLIP(TimesformerPreTrainedModel):
         # pre_pool_output = sequence_output.view(sequence_output.size(0) * self.config.num_frames, -1, sequence_output.size(-1)) # reshape to (batch_size * num_frames, patch_num, hidden_size)
         # FIX BUG HERE with reshape
         # num_patch_width = self.config.image_size // self.config.patch_size
-        # num_patch_height = (encoder_outputs[0].size(1)) // self.config.num_frames // num_patch_width 
+        # num_patch_height = (encoder_outputs[0].size(1)) // self.config.num_frames // num_patch_width
         # pre_pool_output = sequence_output.reshape(sequence_output.size(0), num_patch_height, num_patch_width,self.config.num_frames, sequence_output.size(-1)).permute(0, 3, 1, 2, 4).reshape(sequence_output.size(0) * self.config.num_frames, -1, sequence_output.size(-1))
-        pre_pool_output = sequence_output.reshape(B, -1, T, sequence_output.size(-1)  # (B, N, T, D)
-            ).permute(0, 2, 1, 3  # (B, T, N, D)
-            ).reshape(B * T, -1, sequence_output.size(-1))  # (B*T, N, D)
+        pre_pool_output = (
+            sequence_output.reshape(B, -1, T, sequence_output.size(-1))  # (B, N, T, D)
+            .permute(0, 2, 1, 3)  # (B, T, N, D)
+            .reshape(B * T, -1, sequence_output.size(-1))
+        )  # (B*T, N, D)
         # the reduce step for frame dimension should be done in each task head
-        pooled_output = self.head(pre_pool_output  # (B*T, D)
-            ).reshape(B, T, sequence_output.size(-1))  # (B, T, D)
+        pooled_output = self.head(pre_pool_output).reshape(  # (B*T, D)
+            B, T, sequence_output.size(-1)
+        )  # (B, T, D)
         # pooled_output = pooled_output.to(torch.float32) # TODO why float 16 is auto-transformed here
-        #pooled_output = torch.mean(self.head(pre_pool_output).view(sequence_output.size(0), self.config.num_frames, sequence_output.size(-1)), 1, True).squeeze(1)
-        sequence_output = sequence_output.reshape(B, -1, T, sequence_output.size(-1)).permute(0, 2, 1, 3).reshape(B, T, -1, sequence_output.size(-1))
+        # pooled_output = torch.mean(self.head(pre_pool_output).view(sequence_output.size(0), self.config.num_frames, sequence_output.size(-1)), 1, True).squeeze(1)
+        sequence_output = (
+            sequence_output.reshape(B, -1, T, sequence_output.size(-1))
+            .permute(0, 2, 1, 3)
+            .reshape(B, T, -1, sequence_output.size(-1))
+        )
         if not return_dict:
             return (sequence_output,) + encoder_outputs[1:]
         return BaseModelOutputWithPooling(
@@ -1106,9 +1283,23 @@ class TimesformerImageProcessor:
     """
     Image processor for Timesformer, modified from SigLipImageProcessor
     """
-    def __init__(self, image_mean=(0.5, 0.5, 0.5), image_std=(0.5, 0.5, 0.5), size=(384, 384), crop_size: Dict[str, int] = None, resample=PILImageResampling.BICUBIC, rescale_factor=1 / 255, data_format=ChannelDimension.FIRST):
-        crop_size = crop_size if crop_size is not None else {"height": 384, "width": 384}
-        crop_size = get_size_dict(crop_size, default_to_square=True, param_name="crop_size")
+
+    def __init__(
+        self,
+        image_mean=(0.5, 0.5, 0.5),
+        image_std=(0.5, 0.5, 0.5),
+        size=(384, 384),
+        crop_size: Dict[str, int] = None,
+        resample=PILImageResampling.BICUBIC,
+        rescale_factor=1 / 255,
+        data_format=ChannelDimension.FIRST,
+    ):
+        crop_size = (
+            crop_size if crop_size is not None else {"height": 384, "width": 384}
+        )
+        crop_size = get_size_dict(
+            crop_size, default_to_square=True, param_name="crop_size"
+        )
 
         self.image_mean = image_mean
         self.image_std = image_std
@@ -1129,17 +1320,32 @@ class TimesformerImageProcessor:
         transforms = [
             convert_to_rgb,
             to_numpy_array,
-            partial(resize, size=self.size, resample=self.resample, data_format=self.data_format),
+            partial(
+                resize,
+                size=self.size,
+                resample=self.resample,
+                data_format=self.data_format,
+            ),
             partial(rescale, scale=self.rescale_factor, data_format=self.data_format),
-            partial(normalize, mean=self.image_mean, std=self.image_std, data_format=self.data_format),
-            partial(to_channel_dimension_format, channel_dim=self.data_format, input_channel_dim=self.data_format),
+            partial(
+                normalize,
+                mean=self.image_mean,
+                std=self.image_std,
+                data_format=self.data_format,
+            ),
+            partial(
+                to_channel_dimension_format,
+                channel_dim=self.data_format,
+                input_channel_dim=self.data_format,
+            ),
         ]
 
         images = reduce(lambda x, f: [*map(f, x)], transforms, images)
         data = {"pixel_values": images}
 
         return BatchFeature(data=data, tensor_type=return_tensors)
-    
+
+
 class TimesformerVisionTower(nn.Module):
     def __init__(self, vision_tower, vision_tower_cfg, delay_load=False):
         super().__init__()
@@ -1150,31 +1356,49 @@ class TimesformerVisionTower(nn.Module):
 
         self.vision_tower_name = vision_tower
 
-        
         if not delay_load:
             rank0_print(f"Loading vision tower: {vision_tower}")
             self.load_model()
         elif getattr(vision_tower_cfg, "unfreeze_mm_vision_tower", False):
             # TODO: better detector is needed.
-            rank0_print(f"The checkpoint seems to contain `vision_tower` weights: `unfreeze_mm_vision_tower`: True.")
+            rank0_print(
+                f"The checkpoint seems to contain `vision_tower` weights: `unfreeze_mm_vision_tower`: True."
+            )
             self.load_model()
-        elif hasattr(vision_tower_cfg, "mm_tunable_parts") and "mm_vision_tower" in vision_tower_cfg.mm_tunable_parts:
-            rank0_print(f"The checkpoint seems to contain `vision_tower` weights: `mm_tunable_parts` contains `mm_vision_tower`.")
+        elif (
+            hasattr(vision_tower_cfg, "mm_tunable_parts")
+            and "mm_vision_tower" in vision_tower_cfg.mm_tunable_parts
+        ):
+            rank0_print(
+                f"The checkpoint seems to contain `vision_tower` weights: `mm_tunable_parts` contains `mm_vision_tower`."
+            )
             self.load_model()
         else:
-            rank0_print(f"Force loading checkpoint!!!") #TODO yibin debug
+            rank0_print(f"Force loading checkpoint!!!")  # TODO yibin debug
             self.load_model()
             # self.cfg_only = self.config
 
     def load_model(self, device_map=None):
         if self.is_loaded:
-            rank0_print("{} is already loaded, `load_model` called again, skipping.".format(self.vision_tower_name))
+            rank0_print(
+                "{} is already loaded, `load_model` called again, skipping.".format(
+                    self.vision_tower_name
+                )
+            )
             return
 
         # self.vision_tower = SigLipVisionModel.from_pretrained(self.vision_tower_name, device_map=device_map)
-        self.vision_tower = TimesformerMultiTaskingModelSigLIP.from_pretrained(self.vision_tower_name, device_map=device_map)
+        self.vision_tower = TimesformerMultiTaskingModelSigLIP.from_pretrained(
+            self.vision_tower_name, device_map=device_map
+        )
         self.config = self.vision_tower.config
-        self.image_processor = TimesformerImageProcessor(size=(self.config.image_size, self.config.image_size),crop_size={"height": self.config.image_size, "width": self.config.image_size})
+        self.image_processor = TimesformerImageProcessor(
+            size=(self.config.image_size, self.config.image_size),
+            crop_size={
+                "height": self.config.image_size,
+                "width": self.config.image_size,
+            },
+        )
         # del self.vision_tower.vision_model.encoder.layers[-1:]
         # self.vision_tower.vision_model.head = nn.Identity()
         self.vision_tower.requires_grad_(False)
@@ -1185,15 +1409,23 @@ class TimesformerVisionTower(nn.Module):
         if type(images) is list:
             image_features = []
             for image in images:
-                image_forward_out = self.vision_tower(image.to(device=self.device, dtype=self.dtype).unsqueeze(0), output_hidden_states=True)
+                image_forward_out = self.vision_tower(
+                    image.to(device=self.device, dtype=self.dtype).unsqueeze(0),
+                    output_hidden_states=True,
+                )
                 image_feature = image_forward_out.hidden_states[-1].to(image.dtype)
                 assert image_features.shape[-2] == 729
                 image_features.append(image_feature)
         else:
             # images should be a tensor of shape (B, T, C, H, W)
-            image_forward_outs = self.vision_tower(images.to(device=self.device, dtype=self.dtype), output_hidden_states=True)
+            image_forward_outs = self.vision_tower(
+                images.to(device=self.device, dtype=self.dtype),
+                output_hidden_states=True,
+            )
             # image_features = image_forward_outs.hidden_states[-1].to(images.dtype)
-            image_features = image_forward_outs.last_hidden_state.to(images.dtype) # (B, T, N, D)
+            image_features = image_forward_outs.last_hidden_state.to(
+                images.dtype
+            )  # (B, T, N, D)
             # assert image_features.shape[-2] == 729
 
         return image_features
@@ -1228,5 +1460,3 @@ class TimesformerVisionTower(nn.Module):
     @property
     def image_size(self):
         return self.config.image_size
-
-    
