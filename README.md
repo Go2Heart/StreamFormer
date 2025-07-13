@@ -45,7 +45,7 @@ Check the [README](downstream/OAD/README.md) of OAD.
 
 Follow the [README](downstream/OVIS/README.md) of CTVIS to install the corresponding environment.
 
-Train Streamformer for OVIS.
+Train StreamFormer for OVIS.
 ```bash
 export DETECTRON2_DATASETS=/PATH/TO/VIS/DATA;
 python -m downstream.OVIS.train_ctvis --resume --config-file downstream/OVIS/configs/ytvis_2019/CTVIS_Streamformer.yaml --num-gpus 4
@@ -60,7 +60,7 @@ Prepare the necessary data:
  - [LLaVA-Next-Data](https://huggingface.co/datasets/lmms-lab/LLaVA-NeXT-Data)
  - [LLaVA-Video-178K](https://huggingface.co/datasets/lmms-lab/LLaVA-Video-178K)
 
-Train streamformer checkpoint in 3 statges.
+Train StreamFormer checkpoint in 3 statges.
 ```bash
 cd downstream/VideoQA
 ## stage 1 for pretraining
