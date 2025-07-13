@@ -38,13 +38,50 @@ bash scripts/pretrain_streamformer.sh
 
 ### Evaluations
 1. OAD
+Check OAD [README](downstream/OAD/README.md).
 
 2. OVIS
+Follow the [README](downstream/OVIS/README.md) of CTVIS to install the corresponding environment.
+
+Train Streamformer for OVIS.
+```bash
+export DETECTRON2_DATASETS=/PATH/TO/VIS/DATA;
+python -m downstream.OVIS.train_ctvis --resume --config-file downstream/OVIS/configs/ytvis_2019/CTVIS_Streamformer.yaml --num-gpus 4
+```
 
 3. VideoQA
+Follow the [README](downstream/VideoQA/README.md) of LLaVA-NeXT to install the corresponding environment.
 
+Prepare the necessary data:
+ - [LLaVA-Pretrain](https://huggingface.co/datasets/liuhaotian/LLaVA-Pretrain)
+ - [LLaVA-Next-Data](https://huggingface.co/datasets/lmms-lab/LLaVA-NeXT-Data)
+ - [LLaVA-Video-178K](https://huggingface.co/datasets/lmms-lab/LLaVA-Video-178K)
 
-## Citations
+Train streamformer checkpoint in 3 statges.
+```bash
+cd downstream/VideoQA
+## stage 1 for pretraining
+bash scripts/train/stage1_pretrain_timesformer_siglip_base.sh
+
+## stage 2 for image-qa instruction tuning
+bash scripts/train/stage2_direct_finetune_timesformer_siglip_base.sh 
+
+## stage 3 for video-qa instruction tuning
+bash scripts/train/stage3_direct_finetune_timesformer_video_only.sh 
+```
 
 ## Ackowledgements
 Thanks to the codebase of [UMT](https://github.com/OpenGVLab/unmasked_teacher/tree/main), [transformers](https://github.com/huggingface/transformers/tree/main), [MAT](https://github.com/Echo0125/MAT-Memory-and-Anticipation-Transformer), [CTVIS](https://github.com/KainingYing/CTVIS), [LLaVA-Next](https://github.com/LLaVA-VL/LLaVA-NeXT/tree/main?tab=readme-ov-file).
+
+## Citations
+If you find our work useful, please cite:
+```bibtex
+@misc{yan2025learning,
+    title={Learning Streaming Video Representation via Multitask Training},
+    author={Yibin Yan and Jilan Xu and Shangzhe Di and Yikun Liu and Yudi Shi and Qirui Chen and Zeqian Li and Yifei Huang and Weidi Xie},
+    year={2025},
+    eprint={2504.20041},
+    archivePrefix={arXiv},
+    primaryClass={cs.CV}
+}
+```
