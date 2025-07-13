@@ -1,0 +1,13 @@
+# Miscellaneous
+*.DS_Store
+*.swp
+*.pyc
+
+# PyTorch models
+checkpoints/*
+*.pth
+
+# Dataset soft links
+data/THUMOS
+data/TVSeries
+data/HACS

@@ -1,0 +1,226 @@
+DATASETS:
+  TRAIN: ("coco_2017_train",)
+  TEST: ("coco_2017_val",)
+  
+SOLVER:
+  # IMS_PER_BATCH: 64
+  # BASE_LR: 0.0004
+  # STEPS: (81944, 88773)
+  # MAX_ITER: 92188
+  IMS_PER_BATCH: 16
+  BASE_LR: 0.0001
+  STEPS: (327778, 355092)
+  MAX_ITER: 368750
+  WARMUP_FACTOR: 1.0
+  WARMUP_ITERS: 10
+  WEIGHT_DECAY: 0.05
+  OPTIMIZER: "ADAMW"
+  BACKBONE_MULTIPLIER: 0.1
+  CLIP_GRADIENTS:
+    ENABLED: True
+    CLIP_TYPE: "full_model"
+    CLIP_VALUE: 0.01
+    NORM_TYPE: 2.0
+  AMP:
+    ENABLED: True
+INPUT:
+  IMAGE_SIZE: 1024
+  MIN_SCALE: 0.1
+  MAX_SCALE: 2.0
+  FORMAT: "RGB"
+  DATASET_MAPPER_NAME: "coco_instance_lsj"
+TEST:
+  EVAL_PERIOD: 2000
+DATALOADER:
+  FILTER_EMPTY_ANNOTATIONS: True
+  NUM_WORKERS: 4
+VERSION: 2
+
+MODEL:
+  WEIGHTS: null
+  PIXEL_MEAN: [127.5, 127.5, 127.5]
+  PIXEL_STD: [127.5, 127.5, 127.5]
+  BACKBONE:
+    PRETRAINED: checkpoints/timesformer-siglip-16
+    HIDDEN_SIZE: 768
+    # CHECKPOINT: /inspire/ssd/ws-f4d69b29-e0a5-44e6-bd92-acf4de9990f0/public-project/yanyibin-240108100044/outputs/Pits2_output/ytvis_only/checkpoint-epoch.pth
+    ADD_VIT_FEATURE: true
+    CFFN_RATIO: 0.25
+    CNN_FEATURE_INTERACTION:
+    - true
+    - true
+    - true
+    - true
+    CONV_INPLANE: 64
+    DEFORM_NUM_HEADS: 16
+    DEFORM_RATIO: 0.5
+    DEPTH: 24
+    DROP_PATH_RATE: 0.3
+    EMBED_DIM: 1024
+    EXTRA_NUM: 4
+    FREEZE_AT: 0
+    HIDDEN_SIZE: 768
+    IMAGE_SIZE: 592
+    INIT_VALUES: 0.0
+    INTERACTION_INDEXES:
+    - - 0
+      - 5
+    - - 6
+      - 11
+    - - 12
+      - 17
+    - - 18
+      - 23
+    MLP_RATIO: 4
+    NAME: build_resnet_backbone
+    NUM_HEADS: 16
+    N_POINTS:
+    - 4
+    OUT_EMBEDS:
+    - 1024
+    - 1024
+    - 1024
+    - 1024
+    PATCH_SIZE: 16
+    PRETRAIN: ./work_dirs/dinov2_vitl14_pretrain_.pth
+    PRETRAIN_SIZE: 592
+    USE_CTI_TOC:
+    - true
+    - true
+    - true
+    - true
+    USE_CTI_TOV:
+    - true
+    - true
+    - true
+    - true
+    USE_EXTRA_CTI: true
+    WINDOW_ATTN:
+    - true
+    - true
+    - false
+    - true
+    - true
+    - false
+    - true
+    - true
+    - false
+    - true
+    - true
+    - false
+    - true
+    - true
+    - false
+    - true
+    - true
+    - false
+    - true
+    - true
+    - false
+    - true
+    - true
+    - false
+    WINDOW_SIZE:
+    - 14
+    - 14
+    - null
+    - 14
+    - 14
+    - null
+    - 14
+    - 14
+    - null
+    - 14
+    - 14
+    - null
+    - 14
+    - 14
+    - null
+    - 14
+    - 14
+    - null
+    - 14
+    - 14
+    - null
+    - 14
+    - 14
+    - null
+    WITH_CFFN: true
+  # RESNETS:
+  #   DEPTH: 50
+  #   STEM_TYPE: "basic"  # not used
+  #   STEM_OUT_CHANNELS: 64
+  #   STRIDE_IN_1X1: False
+  #   OUT_FEATURES: ["res2", "res3", "res4", "res5"]
+  #   # NORM: "SyncBN"
+  #   RES5_MULTI_GRID: [1, 1, 1]  # not used
+  META_ARCHITECTURE: "TimesformerMaskFormer"
+  MASK_ON: true
+  SEM_SEG_HEAD:
+    NAME: "MaskFormerHead"
+    IGNORE_VALUE: 255
+    NUM_CLASSES: 80
+    LOSS_WEIGHT: 1.0
+    CONVS_DIM: 256
+    MASK_DIM: 256
+    NORM: "GN"
+    # pixel decoder
+    PIXEL_DECODER_NAME: "MSDeformAttnPixelDecoder"
+    IN_FEATURES: ["res2", "res3", "res4", "res5"]
+    DEFORMABLE_TRANSFORMER_ENCODER_IN_FEATURES: ["res3", "res4", "res5"]
+    COMMON_STRIDE: 4
+    TRANSFORMER_ENC_LAYERS: 6
+  MASK_FORMER:
+    TRANSFORMER_DECODER_NAME: "MultiScaleMaskedTransformerDecoder"
+    TRANSFORMER_IN_FEATURE: "multi_scale_pixel_decoder"
+    DEEP_SUPERVISION: True
+    NO_OBJECT_WEIGHT: 0.1
+    CLASS_WEIGHT: 2.0
+    MASK_WEIGHT: 5.0
+    DICE_WEIGHT: 5.0
+    HIDDEN_DIM: 256
+    NUM_OBJECT_QUERIES: 100
+    NHEADS: 8
+    DROPOUT: 0.0
+    DIM_FEEDFORWARD: 2048
+    ENC_LAYERS: 0
+    PRE_NORM: False
+    ENFORCE_INPUT_PROJ: False
+    SIZE_DIVISIBILITY: 32
+    DEC_LAYERS: 10  # 9 decoder layers, add one for the loss on learnable query
+    TRAIN_NUM_POINTS: 12544
+    OVERSAMPLE_RATIO: 3.0
+    IMPORTANCE_SAMPLE_RATIO: 0.75
+    TEST:
+      SEMANTIC_ON: False
+      INSTANCE_ON: True
+      PANOPTIC_ON: False
+      OVERLAP_THRESHOLD: 0.8
+      OBJECT_MASK_THRESHOLD: 0.8
+  RESNETS:
+    DEFORM_MODULATED: false
+    DEFORM_NUM_GROUPS: 1
+    DEFORM_ON_PER_STAGE:
+    - false
+    - false
+    - false
+    - false
+    DEPTH: 50
+    NORM: FrozenBN
+    NUM_GROUPS: 1
+    OUT_FEATURES:
+    - res2
+    - res3
+    - res4
+    - res5
+    RES2_OUT_CHANNELS: 256
+    RES4_DILATION: 1
+    RES5_DILATION: 1
+    RES5_MULTI_GRID:
+    - 1
+    - 1
+    - 1
+    STEM_OUT_CHANNELS: 64
+    STEM_TYPE: basic
+    STRIDE_IN_1X1: false
+    WIDTH_PER_GROUP: 64

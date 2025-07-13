@@ -410,7 +410,7 @@ class TimesformerEmbeddingsSigLIP(nn.Module):
         patch_pos_embed = patch_pos_embed.permute(0, 2, 3, 1).reshape(1, -1, dim)
         return patch_pos_embed.to(previous_dtype)
 
-    def forward(self, pixel_values):
+    def forward(self, pixel_values, return_size=False):
         batch_size, num_frames, _, height, width = pixel_values.shape
         embeddings, _, _ = self.patch_embeddings(pixel_values)  # (B*T, N, D)
 
@@ -452,7 +452,8 @@ class TimesformerEmbeddingsSigLIP(nn.Module):
             embeddings = embeddings.reshape(
                 batch_size, num_patch * num_frames, num_dim
             )  # (B, N*T, D)
-
+        if return_size:
+            return embeddings, height // self.patch_embeddings.patch_size[0], width // self.patch_embeddings.patch_size[1]
         return embeddings  # (B, N*T, D)
 
 
