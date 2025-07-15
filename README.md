@@ -19,6 +19,7 @@
 - [x] Add instructions for quick start.
 - [x] Add downstream evaluation pipelines.
 - [ ] Release StreamFormer Checkpoints.
+- [ ] Release Datasets Annotations.
 
 ## Quick Start
 ### Installation
