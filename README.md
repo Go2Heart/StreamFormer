@@ -37,11 +37,15 @@ bash scripts/pretrain_streamformer.sh
 
 
 ### Evaluations
-#### 1. OAD
+#### 1. Action Recognition
 
-Check the [README](downstream/OAD/README.md) of OAD.
+Check the [README](downstream/AR/README.md) of Action Recognition.
 
-#### 2. OVIS
+#### 2. Online Action Detection
+
+Check the [README](downstream/OAD/README.md) of Online Action Detection.
+
+#### 3. OVIS
 
 Follow the [README](downstream/OVIS/README.md) of CTVIS to install the corresponding environment.
 
@@ -51,7 +55,7 @@ export DETECTRON2_DATASETS=/PATH/TO/VIS/DATA;
 python -m downstream.OVIS.train_ctvis --resume --config-file downstream/OVIS/configs/ytvis_2019/CTVIS_Streamformer.yaml --num-gpus 4
 ```
 
-#### 3. VideoQA
+#### 4. VideoQA
 
 Follow the [README](downstream/VideoQA/README.md) of LLaVA-NeXT to install the corresponding environment.
 

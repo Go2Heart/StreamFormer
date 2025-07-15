@@ -54,7 +54,7 @@ def extract_feature(args):
     val_file = os.path.join(args.dataset_annotation_folder, "val.json")
     with open(val_file, 'r') as f:
         vid_list.extend(json.load(f).keys())
-        if args.data_set == 'THUMOS':
+        if args.data_set == 'THUMOS14':
             vid_list.extend(['test/video_test_0001292.mp4']) ### we miss this in the val set for OAD, mannually add it 
 
     test_file = os.path.join(args.dataset_annotation_folder, "test.json")
