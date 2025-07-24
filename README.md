@@ -1,5 +1,5 @@
 # Learning Streaming Video Representation via Multitask Training
-[ICCV 2025] The official PyTorch implementation of Learning Streaming Video Representation via Multitask Training: https://arxiv.org/abs/2504.20041
+[ICCV 2025 Oral] The official PyTorch implementation of Learning Streaming Video Representation via Multitask Training: https://arxiv.org/abs/2504.20041
 
 <div style="line-height: 1;">
   <a href="https://go2heart.github.io/streamformer/" target="_blank" style="margin: 2px;">
