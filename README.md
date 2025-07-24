@@ -1,5 +1,5 @@
 # Learning Streaming Video Representation via Multitask Training
-The official PyTorch implementation of **Learning Streaming Video Representation via Multitask Training**, ICCV 2025 (Oral)
+Official implementation of **Learning Streaming Video Representation via Multitask Training**, ICCV 2025 (Oral)
 
 [*Yibin Yan**](https://go2heart.github.io/), 
 [*Jilan Xu**](https://jazzcharles.github.io/), 
