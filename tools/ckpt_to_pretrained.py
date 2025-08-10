@@ -1,12 +1,12 @@
 import torch
 
-from models import StreamformerConfig, TimesformerForMultiTaskingSigLIP
+from models import StreamformerConfig, StreamformerForMultiTaskingSigLIP
 
 
 def ckpt_to_pretrained(ckpt_path, initial_model_name, pretrained_model_name):
     ckpt = torch.load(ckpt_path)
     multi_task_config = {"THUMOS14": {"label2id": "RESERVED"}}
-    model = TimesformerForMultiTaskingSigLIP.from_pretrained(
+    model = StreamformerForMultiTaskingSigLIP.from_pretrained(
         initial_model_name, multi_task_config, ignore_mismatched_sizes=True
     )
     model.load_state_dict(ckpt["model"])

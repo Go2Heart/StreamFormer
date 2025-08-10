@@ -1252,7 +1252,8 @@ class TimesformerMultiTaskingModelSigLIP(TimesformerPreTrainedModel):
             config.hidden_size, eps=config.layer_norm_eps
         )
         self.head = TimesformerSiglipMultiheadAttentionPoolingHead(config)
-
+        if config.add_lora_spatial:
+            self.add_lora_spatial()
         # Initialize weights and apply final processing
         self.post_init()
 
@@ -1353,7 +1354,7 @@ class TimesformerMultiTaskingModelSigLIP(TimesformerPreTrainedModel):
         )
 
 
-class TimesformerForMultiTaskingSigLIP(TimesformerPreTrainedModel):
+class StreamformerForMultiTaskingSigLIP(TimesformerPreTrainedModel):
     def __init__(self, config, multi_task_config):
         super().__init__(config)
         self.config = config
@@ -1434,7 +1435,9 @@ class TimesformerForMultiTaskingSigLIP(TimesformerPreTrainedModel):
                 )
             else:
                 raise NotImplementedError(f"Task type {task_type} not implemented")
-
+        
+        if config.add_lora_spatial:
+            self.add_lora_spatial()
         self.post_init()
 
     def frozen_backbone(self):

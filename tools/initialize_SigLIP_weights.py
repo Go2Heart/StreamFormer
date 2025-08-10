@@ -6,7 +6,7 @@ from transformers import SiglipModel
 
 from models import (
     StreamformerConfig,
-    TimesformerForMultiTaskingSigLIP,
+    StreamformerForMultiTaskingSigLIP,
 )
 
 
@@ -16,7 +16,7 @@ def main(args):
     config = StreamformerConfig(
         clip_config=siglip_model.config, enable_causal_temporal=True
     )
-    model = TimesformerForMultiTaskingSigLIP(config, None)
+    model = StreamformerForMultiTaskingSigLIP(config, None)
 
     loaded_dict = {}
     for name, param in model.named_parameters():

@@ -107,6 +107,7 @@ class StreamformerConfig(PretrainedConfig):
         drop_path_rate=0,
         clip_config=None,
         enable_causal_temporal=False,
+        add_lora_spatial=False,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -131,3 +132,4 @@ class StreamformerConfig(PretrainedConfig):
         self.drop_path_rate = drop_path_rate
         self.clip_config = clip_config
         self.enable_causal_temporal = enable_causal_temporal
+        self.add_lora_spatial = add_lora_spatial

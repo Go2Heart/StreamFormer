@@ -13,7 +13,7 @@ import yaml
 
 import utils
 from datasets import build_multi_task_dataset
-from models import TimesformerForMultiTaskingSigLIP
+from models import StreamformerForMultiTaskingSigLIP
 from optim_factory import (
     LayerDecayValueAssigner,
     create_optimizer,
@@ -332,7 +332,7 @@ def main(args, ds_init):
     if args.init_vit == "clip":
         raise NotImplementedError("Not implemented yet")
     elif args.init_vit == "siglip":
-        model = TimesformerForMultiTaskingSigLIP.from_pretrained(
+        model = StreamformerForMultiTaskingSigLIP.from_pretrained(
             args.pretrained_model, multi_task_config, ignore_mismatched_sizes=True
         )
     elif args.init_vit == "sam":

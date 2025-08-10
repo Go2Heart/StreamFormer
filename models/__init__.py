@@ -1,2 +1,2 @@
 from .configuration_streamformer import StreamformerConfig
-from .modeling_timesformer_siglip import TimesformerForMultiTaskingSigLIP
+from .modeling_timesformer_siglip import StreamformerForMultiTaskingSigLIP, TimesformerMultiTaskingModelSigLIP

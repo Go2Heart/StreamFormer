@@ -13,7 +13,7 @@ import tqdm
 from decord import VideoReader, cpu
 from datasets.video_transforms import Compose, Resize, CenterCrop, Normalize
 from datasets.volume_transforms import ClipToTensor
-from models import TimesformerForMultiTaskingSigLIP
+from models import StreamformerForMultiTaskingSigLIP
 
 def get_args():
     parser = argparse.ArgumentParser(
@@ -69,7 +69,7 @@ def extract_feature(args):
     
     # get model & load ckpt
     multi_task_config = {}
-    model = TimesformerForMultiTaskingSigLIP.from_pretrained(
+    model = StreamformerForMultiTaskingSigLIP.from_pretrained(
         args.pretrained_model, multi_task_config, ignore_mismatched_sizes=True)
     
     if args.enable_lora_spatial:

@@ -15,10 +15,13 @@ Official implementation of **Learning Streaming Video Representation via Multita
 
 <div style="line-height: 1;">
   <a href="https://go2heart.github.io/streamformer/" target="_blank" style="margin: 2px;">
-    <img alt="Website" src="https://img.shields.io/badge/Website-StreamFormer-536af5?color=536af5&logoColor=white" style="display: inline-block; vertical-align: middle;"/>
+    <img alt="Website" src="https://img.shields.io/badge/Website🌐-StreamFormer-536af5?color=536af5&logoColor=white" style="display: inline-block; vertical-align: middle;"/>
   </a>
   <a href="https://arxiv.org/abs/2504.20041" target="_blank" style="margin: 2px;">
-    <img alt="Arxiv" src="https://img.shields.io/badge/Arxiv-StreamFormer-red?logo=%23B31B1B" style="display: inline-block; vertical-align: middle;"/>
+    <img alt="Arxiv" src="https://img.shields.io/badge/Arxiv📄-StreamFormer-red?logo=%23B31B1B" style="display: inline-block; vertical-align: middle;"/>
+  </a>
+  <a href="https://huggingface.co/StreamFormer/streamformer-timesformer" target="_blank" style="margin: 2px;">
+    <img alt="Huggingface" src="https://img.shields.io/badge/Model🤗-StreamFormer-FFD21E?logo=%23B31B1B" style="display: inline-block; vertical-align: middle;"/>
   </a>
 </div>
 
@@ -30,7 +33,7 @@ Official implementation of **Learning Streaming Video Representation via Multita
 ## TODO
 - [x] Add instructions for quick start.
 - [x] Add downstream evaluation pipelines.
-- [ ] Release StreamFormer Checkpoints.
+- [x] Release StreamFormer Checkpoints.
 - [ ] Release Datasets Annotations.
 
 ## Quick Start
@@ -40,6 +43,29 @@ conda create -n streamformer python=3.10
 conda activate streamformer
 conda install pytorch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 pytorch-cuda=12.4 -c pytorch -c nvidia
 pip install -r requirements.txt
+```
+
+### Pre-trained Model Usage
+We have uploaded our streamformer pre-trained on *Global*-, *Temporal*- and *Spatial*- granularities to [🤗huggingface](https://huggingface.co/StreamFormer/streamformer-timesformer).
+
+#### Inference Usage
+
+```python
+from models import TimesformerMultiTaskingModelSigLIP
+import torch
+model = TimesformerMultiTaskingModelSigLIP.from_pretrained("StreamFormer/streamformer-timesformer").eval()
+with torch.no_grad():
+    fake_frames = torch.randn(1, 16, 3, 224, 224)
+    fake_frames = fake_frames.to(model.device)
+    output = model(fake_frames)
+    # global representation [B, D]
+    print(output.pooler_output[:,-1].shape, output.pooler_output[:,-1])
+    
+    # temporal representation [B, T, D]
+    print(output.pooler_output.shape, output.pooler_output)
+    
+    # spatial representation [B, T, HxW, D]
+    print(output.last_hidden_state.shape, output.last_hidden_state)
 ```
 
 ### Pre-training 
