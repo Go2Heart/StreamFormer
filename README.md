@@ -39,6 +39,8 @@ Official implementation of **Learning Streaming Video Representation via Multita
 ## Quick Start
 ### Installation
 ```bash
+git clone https://github.com/Go2Heart/StreamFormer.git
+cd StreamFormer
 conda create -n streamformer python=3.10
 conda activate streamformer
 conda install pytorch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 pytorch-cuda=12.4 -c pytorch -c nvidia
