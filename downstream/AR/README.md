@@ -34,13 +34,13 @@ On SSv2, you can simply run
 
 |       method      | Top-1 Acc  (%) |  Top-5 Acc(%)  |   checkpoint   |
 |  :-------------:  |  :-----:  |  :-----------------------------------------------------------------------------:  |  :----------:  |
-|  Streamformer |  82.4   | 95.5 | [Download](xxx) |
+|  Streamformer |  82.4   | 95.5 | [Download](https://huggingface.co/StreamFormer/streamformer-downstream/blob/main/action_recognition/k400.pt) |
 
 ### SSv2
 
 |       method      | Top-1 Acc  (%) |  Top-5 Acc(%)  |   checkpoint   |
 |  :-------------:  |  :-----:  |  :-----------------------------------------------------------------------------:  |  :----------:  |
-|  Streamformer |  66.3   | 90.1 | [Download](xxx) |
+|  Streamformer |  66.3   | 90.1 | [Download](https://huggingface.co/StreamFormer/streamformer-downstream/blob/main/action_recognition/ssv2.pt) |
 
 ## Acknowledgements
 

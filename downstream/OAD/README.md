@@ -86,8 +86,8 @@ Note that we use the first online evaluation mode in MAT for simplicity, where e
 
 |       method      | visual feature   |  mAP  (%)  |                             config                                                |   checkpoint   |
 |  :--------------: |  :-------------:  |  :-----:  |  :-----------------------------------------------------------------------------:  |  :----------:  |
-|  MAT (with flow)          |  Streamformer |  73.8    | [yaml](configs/THUMOS/MAT/streamformer_multitask_with_flow.yaml) | [Download](xxx) |
-|  MAT (without flow)          |    Streamformer   |  68.3    | [yaml](configs/THUMOS/MAT/streamformer_multitask_without_flow.yaml)      | [Download](xxx) |
+|  MAT (with flow)          |  Streamformer |  73.8    | [yaml](configs/THUMOS/MAT/streamformer_multitask_with_flow.yaml) | [Download](https://huggingface.co/StreamFormer/streamformer-downstream/blob/main/online_action_detection/thumos_best_with_flow.pt) |
+|  MAT (without flow)          |    Streamformer   |  68.3    | [yaml](configs/THUMOS/MAT/streamformer_multitask_without_flow.yaml)      | [Download](https://huggingface.co/StreamFormer/streamformer-downstream/blob/main/online_action_detection/thumos_best_without_flow.pt) |
 
 ### TVSeries
 
