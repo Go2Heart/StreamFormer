@@ -39,7 +39,7 @@ cd Streamformer
 ./scripts/downstream_extract_oad_feature.sh
 ```
 
-(Optionally) You can also download our pre-extracted feature from [HERE](xxxx).
+(Optionally) You can also download our pre-extracted feature from [HERE](https://huggingface.co/datasets/StreamFormer/streamformer-downstream-features/tree/main).
 
 Put all the files under data/THUMOS or data/TVSeries, and the file structure should be as:
 

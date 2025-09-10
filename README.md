@@ -97,7 +97,6 @@ python -m downstream.OVIS.train_ctvis --resume --config-file downstream/OVIS/con
 ```
 
 #### 4. VideoQA
-
 Follow the [README](downstream/VideoQA/README.md) of LLaVA-NeXT to install the corresponding environment.
 
 Prepare the necessary data:
@@ -117,6 +116,8 @@ bash scripts/train/stage2_direct_finetune_timesformer_siglip_base.sh
 ## stage 3 for video-qa instruction tuning
 bash scripts/train/stage3_direct_finetune_timesformer_video_only.sh 
 ```
+
+For Video QA evaluation, you can use this initial [model checkpoint](https://huggingface.co/StreamFormer/streamformer-llava-vicuna-7b-v1.5) for now to run the evaluation code in our [example](downstream/VideoQA/eval_video.sh)(swapping the ckpt path).
 
 ## Ackowledgements
 Thanks to the codebase of [UMT](https://github.com/OpenGVLab/unmasked_teacher/tree/main), [transformers](https://github.com/huggingface/transformers/tree/main), [MAT](https://github.com/Echo0125/MAT-Memory-and-Anticipation-Transformer), [CTVIS](https://github.com/KainingYing/CTVIS), [LLaVA-Next](https://github.com/LLaVA-VL/LLaVA-NeXT/tree/main?tab=readme-ov-file).
