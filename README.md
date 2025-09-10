@@ -117,7 +117,7 @@ bash scripts/train/stage2_direct_finetune_timesformer_siglip_base.sh
 bash scripts/train/stage3_direct_finetune_timesformer_video_only.sh 
 ```
 
-For Video QA evaluation, you can use this initial [model checkpoint](https://huggingface.co/StreamFormer/streamformer-llava-vicuna-7b-v1.5) for now to run the evaluation code in our [example](downstream/VideoQA/eval_video.sh)(swapping the ckpt path).
+For Video QA evaluation, you can use this initial [model checkpoint](https://huggingface.co/StreamFormer/streamformer-llava-vicuna-7b-v1.5/tree/main) for now to run the evaluation code in our [example](downstream/VideoQA/eval_video.sh)(swapping the ckpt path).
 
 ## Ackowledgements
 Thanks to the codebase of [UMT](https://github.com/OpenGVLab/unmasked_teacher/tree/main), [transformers](https://github.com/huggingface/transformers/tree/main), [MAT](https://github.com/Echo0125/MAT-Memory-and-Anticipation-Transformer), [CTVIS](https://github.com/KainingYing/CTVIS), [LLaVA-Next](https://github.com/LLaVA-VL/LLaVA-NeXT/tree/main?tab=readme-ov-file).
