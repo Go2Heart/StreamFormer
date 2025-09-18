@@ -1531,7 +1531,7 @@ class TimesformerVisionTower(nn.Module):
 
     def forward(self, images):
         if self.streaming_mode:
-            # self.clear_cache() # for eval donot use cache
+            self.clear_cache() # for eval donot use cache
             # images should be a streaming video frame of shape (1, T, C, H, W)
             outputs = self.vision_tower(images.to(device=self.device, dtype=self.dtype), output_hidden_states=True, use_cache=True, past_key_values=self.past_key_values, cache_position=None)
             # saving the hidden states for streaming

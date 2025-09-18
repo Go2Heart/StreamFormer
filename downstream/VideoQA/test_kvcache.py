@@ -9,14 +9,11 @@ from decord import VideoReader, cpu
 import numpy as np
 
 
-
-
-warnings.filterwarnings("ignore")
-pretrained = "/mnt/vision_user/yibinyan/llava/checkpoints/llava/MID_llavanext-checkpoints_streamformer-timesformer-checkpoints_Qwen2.5-7B-Instruct-short-010-v2-stage3"
+pretrained_name = "StreamFormer/streamformer-llava-Qwen2.5-7B-Instruct-v1.5" # IMPORTANT: make sure to enable streaming_mode and set context_length in config.json
 model_name = "llava_qwen"
 device = "cuda"
 device_map = "cuda"
-tokenizer, model, image_processor, max_length = load_pretrained_model(pretrained, None, model_name, device_map=device_map, torch_dtype="bfloat16")
+tokenizer, model, image_processor, max_length = load_pretrained_model(pretrained_name, None, model_name, device_map=device_map, torch_dtype="bfloat16")
 model.eval()
 
 
@@ -54,18 +51,6 @@ conv.append_message(conv.roles[0], question)
 conv.append_message(conv.roles[1], None)
 prompt_question = conv.get_prompt()
 input_ids = tokenizer_image_token(prompt_question, tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt").unsqueeze(0).to(device)
-
-
-# cont = model.generate(
-#     input_ids,
-#     images=video,
-#     modalities= ["video"],
-#     do_sample=False,
-#     temperature=0,
-#     max_new_tokens=4096,
-# )
-# text_outputs = tokenizer.batch_decode(cont, skip_special_tokens=True)[0].strip()
-# print(text_outputs)
 
 cont = model.generate(
     input_ids,
