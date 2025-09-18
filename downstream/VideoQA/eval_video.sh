@@ -1,5 +1,5 @@
 export HF_DATASETS_OFFLINE=1
-export ckpt="/mnt/vision_user/yibinyan/release/Streamformer/downstream/VideoQA/checkpoints/streamformer-llava-Qwen2.5-7B-Instruct"
+export ckpt="StreamFormer/streamformer-llava-Qwen2.5-7B-Instruct-v1.5"
 python3 -m accelerate.commands.launch \
     --num_processes=4 \
     --main_process_port=12341 \
