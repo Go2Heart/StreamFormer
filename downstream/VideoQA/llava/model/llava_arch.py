@@ -209,7 +209,8 @@ class LlavaMetaForCausalLM(ABC):
                     raise ValueError(f"Unexpected modality: {modalities[idx]}")
                 image_feature = self.get_model().get_vision_tower()(image) # (B, T, N, D)
                 image_feature = image_feature.reshape(-1, image_feature.shape[2], image_feature.shape[3]) # (B*T, N, D)
-                image_features.append(self.get_model().mm_projector(image_feature))
+                
+                image_features.append(self.get_model().mm_projector(image_feature.to(dtype=self.get_model().dtype)))
         else:
             images = torch.cat(imagelist, dim=0)
             images = images.unsqueeze(1)

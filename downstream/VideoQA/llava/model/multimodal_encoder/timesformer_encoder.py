@@ -25,28 +25,17 @@ import torch
 import torch.nn.functional
 import torch.utils.checkpoint
 from torch import nn
-from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
-from transformers import (
-    AutoTokenizer,
-    CLIPConfig,
-    CLIPTextConfig,
-    CLIPTextModel,
-    SiglipConfig,
-    SiglipTextModel,
-)
+
 from transformers.activations import ACT2FN
 from transformers.modeling_outputs import (
     BaseModelOutput,
     BaseModelOutputWithPooling,
-    ImageClassifierOutput,
-    ModelOutput,
+    BaseModelOutputWithPast
 )
+from transformers.cache_utils import Cache, DynamicCache
 from transformers.modeling_utils import PreTrainedModel
 from transformers.utils import (
-    add_start_docstrings,
-    add_start_docstrings_to_model_forward,
     logging,
-    replace_return_docstrings,
 )
 
 # from .configuration_timesformerV2 import TimesformerV2Config
@@ -315,7 +304,7 @@ class TimesformerEmbeddingsSigLIP(nn.Module):
         patch_pos_embed = patch_pos_embed.permute(0, 2, 3, 1).reshape(1, -1, dim)
         return patch_pos_embed.to(previous_dtype)
 
-    def forward(self, pixel_values):
+    def forward(self, pixel_values, past_key_values=None):
         batch_size, num_frames, _, height, width = pixel_values.shape
         embeddings, _, _ = self.patch_embeddings(pixel_values)  # (B*T, N, D)
 
@@ -336,23 +325,48 @@ class TimesformerEmbeddingsSigLIP(nn.Module):
                 .permute(0, 2, 1, 3)  # (B, N, T, D)
                 .reshape(batch_size * num_patch, num_frames, num_dim)  # (B*N, T, D)
             )
-            # Resizing time embeddings in case they don't match
-            if num_frames != self.time_embeddings.size(1):
-                if num_frames < self.time_embeddings.size(1):
-                    new_time_embeddings = self.time_embeddings[
-                        :, :num_frames, :
-                    ]  # (1, num_frames, D)
-                else:
-                    time_embeddings = self.time_embeddings.transpose(1, 2)  # (1, D, 8)
-                    new_time_embeddings = nn.functional.interpolate(
-                        time_embeddings, size=(num_frames), mode="nearest"
-                    )  # (1, D, T)
-                    new_time_embeddings = new_time_embeddings.transpose(
-                        1, 2
-                    )  # (1, T, D)
-                embeddings = embeddings + new_time_embeddings  # (B*N, T, D)
+            if past_key_values is not None and hasattr(past_key_values, 'get_seq_length'):
+                past_frames = past_key_values.get_seq_length()
+                start_pos = past_frames
+                end_pos = past_frames + num_frames
             else:
-                embeddings = embeddings + self.time_embeddings
+                start_pos = 0
+                end_pos = num_frames
+                
+            total_needed_frames = end_pos
+            original_time_frames = self.time_embeddings.size(1)
+            
+            # If we need more time embeddings than originally available, interpolate
+            if total_needed_frames > original_time_frames:
+                # Interpolate time embeddings to cover the full sequence
+                time_embeddings = self.time_embeddings.transpose(1, 2)  # (1, D, original_frames)
+                expanded_time_embeddings = nn.functional.interpolate(
+                    time_embeddings, 
+                    size=(total_needed_frames), 
+                    mode="nearest",
+                    align_corners=False
+                )  # (1, D, total_needed_frames)
+                expanded_time_embeddings = expanded_time_embeddings.transpose(1, 2)  # (1, total_needed_frames, D)
+                
+                # Extract the time embeddings for current frames
+                current_time_embeddings = expanded_time_embeddings[:, start_pos:end_pos, :]  # (1, num_frames, D)
+            else:
+                # We have enough original time embeddings
+                if end_pos <= original_time_frames:
+                    # Direct indexing
+                    current_time_embeddings = self.time_embeddings[:, start_pos:end_pos, :]  # (1, num_frames, D)
+                else:
+                    # Need to interpolate
+                    time_embeddings = self.time_embeddings.transpose(1, 2)  # (1, D, original_frames)
+                    expanded_time_embeddings = nn.functional.interpolate(
+                        time_embeddings, 
+                        size=(total_needed_frames), 
+                        mode="nearest",
+                        align_corners=False
+                    )  # (1, D, total_needed_frames)
+                    expanded_time_embeddings = expanded_time_embeddings.transpose(1, 2)  # (1, total_needed_frames, D)
+                    current_time_embeddings = expanded_time_embeddings[:, start_pos:end_pos, :]
+            embeddings = embeddings + current_time_embeddings
             embeddings = self.time_drop(embeddings)
             embeddings = embeddings.reshape(
                 batch_size, num_patch * num_frames, num_dim
@@ -412,13 +426,11 @@ class TimesformerCausalSelfAttention(nn.Module):
         attention_dropout_prob = config.attention_probs_dropout_prob
 
         self.num_heads = num_heads
-        head_dim = config.hidden_size // num_heads
-        self.scale = head_dim**-0.5
+        self.head_dim = config.hidden_size // num_heads
+        self.scale = self.head_dim**-0.5
         self.qkv = nn.Linear(config.hidden_size, config.hidden_size * 3, bias=qkv_bias)
         self.attn_drop = nn.Dropout(attention_dropout_prob)
-        self.register_buffer(
-            "mask", torch.tril(torch.ones(config.num_frames, config.num_frames))
-        )
+
 
     def _add_lora(self, lora_rank):
         # freeze the qkv layer
@@ -476,8 +488,19 @@ class TimesformerCausalSelfAttention(nn.Module):
         # replace the forward method with the lora_forward method
         self.forward = types.MethodType(lora_forward, self)
 
-    def forward(self, hidden_states, output_attentions: bool = False):
+    def forward(
+        self, 
+        hidden_states,
+        output_attentions: bool = False,
+        past_key_value: Optional[Cache] = None,
+        use_cache: bool = False,
+        cache_position: Optional[torch.LongTensor] = None,
+        layer_idx: Optional[int] = None
+    ):
         batch_size, hidden_size, num_channels = hidden_states.shape  # (B*H*W) x T x C
+        if self.training:
+            use_cache =False
+            past_key_value = None
         qkv = (
             self.qkv(hidden_states)
             .reshape(
@@ -490,18 +513,36 @@ class TimesformerCausalSelfAttention(nn.Module):
             .permute(2, 0, 3, 1, 4)  # 3 x B x num_heads x T x head_dim
         )
         query, key, value = qkv[0], qkv[1], qkv[2]
-
+        
+        if past_key_value is not None:
+            key, value = past_key_value.update(key, value, layer_idx,  cache_kwargs={"cache_position": cache_position})
+            
         attention_scores = (query @ key.transpose(-2, -1)) * self.scale
 
-        # causal mask
-        num_frames = hidden_states.shape[1]
-        mask = torch.tril(
-            torch.ones(
-                num_frames, num_frames, device=attention_scores.device, dtype=torch.bool
+        if past_key_value is not None:
+            # For streaming: only mask future positions relative to current query positions
+            total_seq_len = key.shape[-2]
+            current_seq_len = query.shape[-2]
+            
+            # Create causal mask for the current query positions
+            causal_mask = torch.tril(
+                torch.ones(current_seq_len, total_seq_len, device=attention_scores.device, dtype=torch.bool)
             )
-        )
+            
+            # Adjust mask for current position in the sequence
+            if cache_position is not None:
+                start_pos = cache_position[0].item() if len(cache_position) > 0 else 0
+                causal_mask = torch.zeros(current_seq_len, total_seq_len, device=attention_scores.device, dtype=torch.bool)
+                for i in range(current_seq_len):
+                    causal_mask[i, :start_pos + i + 1] = True
+        else:
+            # Standard causal mask for full sequence
+            causal_mask = torch.tril(
+                torch.ones(hidden_size, hidden_size, device=attention_scores.device, dtype=torch.bool)
+            )
+
         attention_scores = attention_scores.masked_fill(
-            mask == 0, float("-inf")
+            ~causal_mask, float("-inf")
         )  # mask out future frames
         attention_probs = attention_scores.softmax(dim=-1)
         attention_probs = self.attn_drop(attention_probs)
@@ -677,8 +718,19 @@ class TimeSformerCausalAttention(nn.Module):
         self,
         hidden_states: torch.Tensor,
         output_attentions: bool = False,
+        past_key_value: Optional[Cache] = None,
+        use_cache: bool = False,
+        cache_position: Optional[torch.LongTensor] = None,
+        layer_idx: Optional[int] = None,
     ) -> Union[Tuple[torch.Tensor, torch.Tensor], Tuple[torch.Tensor]]:
-        self_outputs = self.attention(hidden_states, output_attentions)
+        self_outputs = self.attention(
+            hidden_states,
+            output_attentions=output_attentions,
+            past_key_value=past_key_value,
+            use_cache=use_cache,
+            cache_position=cache_position,
+            layer_idx=layer_idx
+        ) 
 
         attention_output = self.output(self_outputs[0])
 
@@ -795,6 +847,10 @@ class TimesformerLayerSigLIP(nn.Module):
         hidden_states: torch.Tensor,
         num_frames: int,
         output_attentions: bool = False,
+        past_key_value: Optional[Cache] = None,
+        use_cache: bool = False,
+        cache_position: Optional[torch.LongTensor] = None,
+        layer_idx: Optional[int] = None
     ):
         # hidden_states: (B, N*T, D)
 
@@ -835,9 +891,24 @@ class TimesformerLayerSigLIP(nn.Module):
             #     batch_size, num_patch_height, num_patch_width, num_frames, temporal_embedding.shape[2]
             # ).reshape(batch_size * num_patch_height * num_patch_width, num_frames, temporal_embedding.shape[2]) # (B*N, T, D) s.t. temporal attension is applied to the same patch within frames
 
-            temporal_attention_outputs = self.temporal_attention(
-                self.temporal_layernorm(temporal_embedding),
-            )
+            # temporal_attention_outputs = self.temporal_attention(
+            #     self.temporal_layernorm(temporal_embedding),
+            # )
+            if self.config.enable_causal_temporal and isinstance(self.temporal_attention, TimeSformerCausalAttention):
+                temporal_attention_outputs = self.temporal_attention(
+                    self.temporal_layernorm(temporal_embedding),
+                    output_attentions=output_attentions,
+                    past_key_value=past_key_value,
+                    use_cache=use_cache,
+                    cache_position=cache_position,
+                    layer_idx=layer_idx
+                )
+            else:
+                # Non-causal temporal attention doesn't use caching
+                temporal_attention_outputs = self.temporal_attention(
+                    self.temporal_layernorm(temporal_embedding),
+                    output_attentions=output_attentions
+                )
             attention_output = temporal_attention_outputs[
                 0
             ]  # (B*N, T, D) only the attention output wanted
@@ -945,10 +1016,17 @@ class TimesformerEncoder(nn.Module):
         output_attentions: bool = False,
         output_hidden_states: bool = False,
         return_dict: bool = True,
+        past_key_values: Optional[Cache] = None,
+        use_cache: bool = False,
+        cache_position: Optional[torch.LongTensor] = None,
     ) -> Union[tuple, BaseModelOutput]:
         all_hidden_states = () if output_hidden_states else None
         all_self_attentions = () if output_attentions else None
 
+        # Initialize cache if needed
+        if use_cache and past_key_values is None:
+            past_key_values = DynamicCache()
+        
         for i, layer_module in enumerate(self.layer):
             if output_hidden_states:
                 all_hidden_states = all_hidden_states + (hidden_states,)
@@ -959,10 +1037,20 @@ class TimesformerEncoder(nn.Module):
                     hidden_states,
                     num_frames,
                     output_attentions,
+                    past_key_values,
+                    use_cache,
+                    cache_position,
+                    i
                 )
             else:
                 layer_outputs = layer_module(
-                    hidden_states, num_frames, output_attentions
+                    hidden_states, 
+                    num_frames, 
+                    output_attentions,
+                    past_key_value=past_key_values,
+                    use_cache=use_cache,
+                    cache_position=cache_position,
+                    layer_idx=i
                 )
 
             hidden_states = layer_outputs[0]
@@ -979,11 +1067,19 @@ class TimesformerEncoder(nn.Module):
                 for v in [hidden_states, all_hidden_states, all_self_attentions]
                 if v is not None
             )
-        return BaseModelOutput(
-            last_hidden_state=hidden_states,
-            hidden_states=all_hidden_states,
-            attentions=all_self_attentions,
-        )
+        if use_cache:
+            return BaseModelOutputWithPast(
+                last_hidden_state=hidden_states,
+                hidden_states=all_hidden_states,
+                attentions=all_self_attentions,
+                past_key_values=past_key_values,
+            )
+        else:
+            return BaseModelOutput(
+                last_hidden_state=hidden_states,
+                hidden_states=all_hidden_states,
+                attentions=all_self_attentions,
+            )
 
 
 class TimesformerPreTrainedModel(PreTrainedModel):
@@ -1223,6 +1319,9 @@ class TimesformerMultiTaskingModelSigLIP(TimesformerPreTrainedModel):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
+        past_key_values: Optional[Cache] = None,
+        use_cache: bool = False,
+        cache_position: Optional[torch.LongTensor] = None,
     ) -> Union[Tuple[torch.FloatTensor], BaseModelOutput]:
         output_attentions = (
             output_attentions
@@ -1237,14 +1336,28 @@ class TimesformerMultiTaskingModelSigLIP(TimesformerPreTrainedModel):
         return_dict = (
             return_dict if return_dict is not None else self.config.use_return_dict
         )
-        embedding_output = self.embeddings(pixel_values)  # (B, N*T, D)
         B, T, _, _, _ = pixel_values.shape
+        if use_cache and cache_position is None:
+            if past_key_values is None:
+                cache_position = torch.arange(0, T, dtype=torch.long, device=pixel_values.device)
+            else:
+                cache_position = torch.arange(
+                    past_key_values.get_seq_length() if hasattr(past_key_values, 'get_seq_length') else 0,
+                    past_key_values.get_seq_length() + T if hasattr(past_key_values, 'get_seq_length') else T,
+                    dtype=torch.long,
+                    device=pixel_values.device
+                )
+        
+        embedding_output = self.embeddings(pixel_values, past_key_values=past_key_values)  # (B, N*T, D)
         encoder_outputs = self.encoder(
             embedding_output,
             num_frames=T,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
+            past_key_values=past_key_values,
+            use_cache=use_cache,
+            cache_position=cache_position,
         )
         sequence_output = encoder_outputs[0]
         sequence_output = self.post_layernorm(sequence_output)  # (B, N*T, D)
@@ -1271,11 +1384,11 @@ class TimesformerMultiTaskingModelSigLIP(TimesformerPreTrainedModel):
         )
         if not return_dict:
             return (sequence_output,) + encoder_outputs[1:]
-        return BaseModelOutputWithPooling(
+        return BaseModelOutputWithPast(
             last_hidden_state=sequence_output,
-            pooler_output=pooled_output,
             hidden_states=encoder_outputs.hidden_states,  # L x (B, N*T, D)
             attentions=encoder_outputs.attentions,
+            past_key_values=encoder_outputs.past_key_values if use_cache else None,
         )
 
 
@@ -1377,7 +1490,14 @@ class TimesformerVisionTower(nn.Module):
             rank0_print(f"Force loading checkpoint!!!")  # TODO yibin debug
             self.load_model()
             # self.cfg_only = self.config
-
+        
+        self.streaming_mode = getattr(vision_tower_cfg, "streaming_mode", False)
+        if self.streaming_mode:
+            context_length = getattr(vision_tower_cfg, "context_length", 16)
+            print(f"Streamformer-Timesformer Using streaming mode with context length: {context_length}")
+            self.context_length = context_length
+            self.past_key_values = None
+            self.hidden_states = None
     def load_model(self, device_map=None):
         if self.is_loaded:
             rank0_print(
@@ -1404,8 +1524,24 @@ class TimesformerVisionTower(nn.Module):
         self.vision_tower.requires_grad_(False)
 
         self.is_loaded = True
+        
+    def clear_cache(self):
+        self.hidden_states = None
+        self.past_key_values = None
 
     def forward(self, images):
+        if self.streaming_mode:
+            # self.clear_cache() # for eval donot use cache
+            # images should be a streaming video frame of shape (1, T, C, H, W)
+            outputs = self.vision_tower(images.to(device=self.device, dtype=self.dtype), output_hidden_states=True, use_cache=True, past_key_values=self.past_key_values, cache_position=None)
+            # saving the hidden states for streaming
+            self.hidden_states = torch.cat([self.hidden_states, outputs.last_hidden_state], dim=1) if self.hidden_states is not None else outputs.last_hidden_state # concating along the time dimension
+            self.past_key_values = outputs.past_key_values
+            
+            image_features = self.hidden_states[:, -self.context_length:, :].to(images.dtype)
+            
+            # image_features = outputs.last_hidden_state.to(images.dtype)
+            return image_features
         if type(images) is list:
             image_features = []
             for image in images:
