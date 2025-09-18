@@ -97,6 +97,11 @@ python -m downstream.OVIS.train_ctvis --resume --config-file downstream/OVIS/con
 ```
 
 #### 4. VideoQA
+[🔥News!] We have released our new VideoQA Model (VideoMME(w/o subtitles): 55.0) based on Qwen2.5: [[🤗HF Link]](https://huggingface.co/StreamFormer/streamformer-llava-Qwen2.5-7B-Instruct/tree/main).
+
+The model can now inference for streaming video input (e.g. when the input video and user query is asynchronous) , with KV-Cache enabled for StreamFormer! For usage example, please check out our naive test script [test_kvcache.py](downstream/VideoQA/test_kvcache.py).
+
+
 Follow the [README](downstream/VideoQA/README.md) of LLaVA-NeXT to install the corresponding environment.
 
 Prepare the necessary data:
