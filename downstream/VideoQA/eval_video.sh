@@ -5,7 +5,7 @@ python3 -m accelerate.commands.launch \
     --main_process_port=12341 \
     -m lmms_eval \
     --model llava_vid \
-    --tasks videomme \
+    --tasks videomme,mlvd \
     --batch_size 1 \
     --log_samples \
     --log_samples_suffix llava_next \
