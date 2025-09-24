@@ -1,5 +1,5 @@
 export HF_DATASETS_OFFLINE=1
-export ckpt="StreamFormer/streamformer-llava-Qwen2.5-7B-Instruct-v1.5"
+export ckpt="checkpoints/streamformer-llava-vicuna-7b-v1.5"
 python3 -m accelerate.commands.launch \
     --num_processes=4 \
     --main_process_port=12341 \
@@ -10,5 +10,7 @@ python3 -m accelerate.commands.launch \
     --log_samples \
     --log_samples_suffix llava_next \
     --output_path ./logs/ \
-    --model_args pretrained=$ckpt,video_decode_backend=decord,max_frames_num=16,mm_spatial_pool_mode=average,mm_newline_position=grid,mm_resampler_location=after,conv_template=qwen_1_5,device_map=cuda \
+    --model_args pretrained=$ckpt,video_decode_backend=decord,max_frames_num=16,mm_spatial_pool_mode=average,mm_newline_position=no_token,mm_resampler_location=after \
+    #for qwen: ,conv_template=qwen_1_5,device_map=cuda \
+
     
