@@ -8,5 +8,5 @@ submitit
 scikit-image
 opencv-python
 addict
-Pillow==8.2.0
+Pillow==10.3.0
 setuptools==58.2.0 
