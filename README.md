@@ -34,7 +34,7 @@ Official implementation of **Learning Streaming Video Representation via Multita
 - [x] Add instructions for quick start.
 - [x] Add downstream evaluation pipelines.
 - [x] Release StreamFormer Checkpoints.
-- [ ] Release Datasets Annotations.
+- [x] Release Datasets Annotations.
 
 ## Quick Start
 ### Installation
@@ -71,6 +71,8 @@ with torch.no_grad():
 ```
 
 ### Pre-training 
+To download our pre-training video annotations, use this [link](https://www.dropbox.com/scl/fi/f5utos9fb7irfekpcw1ir/streamformer_annotation.zip?rlkey=t8utee0lmhlxxtv8payti6j1q&st=lbhe29kk&dl=0).
+
 Change some necessary paths in [scripts/pretrain_streamformer.sh](scripts/pretrain_streamformer.sh) and [dataset metadata](scripts/dataset_metadata/all.yaml), and run the scripts.
 ```bash
 bash scripts/pretrain_streamformer.sh 
