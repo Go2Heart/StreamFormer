@@ -132,12 +132,12 @@ Thanks to the codebase of [UMT](https://github.com/OpenGVLab/unmasked_teacher/tr
 ## Citations
 If you find our work useful, please cite:
 ```bibtex
-@misc{yan2025learning,
-    title={Learning Streaming Video Representation via Multitask Training},
-    author={Yibin Yan and Jilan Xu and Shangzhe Di and Yikun Liu and Yudi Shi and Qirui Chen and Zeqian Li and Yifei Huang and Weidi Xie},
-    year={2025},
-    eprint={2504.20041},
-    archivePrefix={arXiv},
-    primaryClass={cs.CV}
+@InProceedings{Yan_2025_ICCV,
+    author    = {Yan, Yibin and Xu, Jilan and Di, Shangzhe and Liu, Yikun and Shi, Yudi and Chen, Qirui and Li, Zeqian and Huang, Yifei and Xie, Weidi},
+    title     = {Learning Streaming Video Representation via Multitask Training},
+    booktitle = {Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV)},
+    month     = {October},
+    year      = {2025},
+    pages     = {9900-9912}
 }
 ```
