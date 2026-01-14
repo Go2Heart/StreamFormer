@@ -23,7 +23,7 @@ sympy==1.13.1
 tensorboardX==2.6.4
 timm==1.0.17
 tokenizers==0.21.2
-torch==2.5.1
+torch==2.8.0
 torchaudio==2.5.1
 torchvision==0.20.1
 tqdm==4.67.1
