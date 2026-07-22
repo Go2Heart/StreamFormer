@@ -286,7 +286,7 @@ tomli==2.0.1
 toolz==0.12.1
 torch==2.1.2
 torchvision==0.16.2
-tornado==6.4
+tornado==6.5.7
 tox==3.28.0
 tqdm-multiprocess==0.0.11
 tqdm==4.66.2
